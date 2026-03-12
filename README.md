@@ -31,6 +31,9 @@ DNS zone transfer tester that attempts to retrieve DNS records from misconfigure
 ### Judas
 Directory-based web content scanner that searches for keywords such as flags within discovered resources.
 
+### SunTzu
+Directory and endpoint enumeration tool for discovering hidden paths on web servers using wordlists.
+
 ## Architecture
 
 Caesar follows a modular architecture composed of the following components:
@@ -59,8 +62,13 @@ Example:
   "description": "Example module",
   "entry": "wrapper.sh",
   "options": {
-    "TARGET": { "required": true },
-    "PORT": { "required": false }
+    "TARGET": {
+      "required": true
+    },
+    "PORT": {
+      "required": false
+      "default": "80"
+    }
   }
 }
 ```
@@ -99,6 +107,11 @@ Set option values:
 set DOMAIN example.com
 ```
 
+Set option value to blank:
+```
+unset PORT
+```
+
 Run the selected module:
 
 ```
@@ -109,6 +122,11 @@ Deselect the current tool:
 
 ```
 deselect
+```
+
+Reset tool settings to default:
+```
+reset
 ```
 
 Exit the console:
@@ -128,7 +146,8 @@ caesar/
 └── modules/
     ├── napoleon/
     ├── judas/
-    └── bismarck/
+    ├── bismarck/
+    └── suntzu/
 ```
 
 ## Design Goals
@@ -155,9 +174,6 @@ Subdomain enumeration tool that brute-forces subdomains using DNS queries and wo
 
 ### Hannibal
 Network host discovery tool designed to identify live hosts on a network through scanning techniques.
-
-### SunTzu
-Directory and endpoint enumeration tool for discovering hidden paths on web servers using wordlists.
 
 ### Turing
 Web technology fingerprinting tool that identifies frameworks and server technologies through HTTP response analysis.
