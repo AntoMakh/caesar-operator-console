@@ -55,7 +55,9 @@ class CaesarConsole(cmd.Cmd):
             print("Usage: select <tool>")
             return False
         tool = arg.split()[0]
-        if(tool in self.tools):
+        if self.current_tool:
+            self.reset_options()
+        if tool in self.tools:
             self.current_tool = tool
             print("Selected tool: " + tool)
             self.prompt = 'caesar (' + tool + ') > '
