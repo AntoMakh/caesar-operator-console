@@ -17,6 +17,7 @@ def normalize_module(metadata, module_path):
         }
 
     return {
+        "name": metadata.get("name", ""),
         "description": metadata.get("description", ""),
         "entry": entry_path,
         "options": options

@@ -136,6 +136,21 @@ class CaesarConsole(cmd.Cmd):
                 command.append(str(option_value["value"]))
         return command
 
+    def do_info(self, arg):
+        tool = arg.split()[0]
+        if tool not in self.tools:
+            print("Tool not found: " + tool)
+            print("Use 'tools' command to see available tools.")
+            return False
+        tool = self.tools[tool]
+        print("Tool: " + tool["name"])
+        print("Description: " + tool["description"])
+        print("Entry: " + tool["entry"])
+        print("Options:")
+        for option_name, option_info in tool["options"].items():
+            required = " (required)" if option_info["required"] else ""
+            value = option_info["value"]
+            print(f" - {option_name:<30}{value}{required}")
 
     def do_run(self, arg):
         if not self.check_if_tool_selected():
