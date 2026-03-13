@@ -17,6 +17,7 @@ Each tool is implemented as a module with a metadata file describing its interfa
 - Modular tool architecture
 - Support for tools written in multiple languages
 - Option management for module parameters
+- Tab completion for commands, tools, and options
 - Wrapper support for integrating legacy tools
 - Consistent command interface
 
@@ -93,6 +94,8 @@ Start the console:
 ```bash
 python caesar.py
 ```
+
+Use the Tab key to autocomplete commands, tool names, and option names inside the console.
 
 List available tools:
 
@@ -180,8 +183,12 @@ caesar/
 
 Planned improvements include:
 
-- Tab completion for commands and options
 - Improved output formatting
+- Save and load module option configurations
+- Dependency checks for external tools and scripts
+- Better validation and error messages for module metadata
+- More detailed tool information and help output
+- Cleaner run output and command preview display
 - Additional reconnaissance modules
 
 ## Future Tools in Development

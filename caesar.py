@@ -26,6 +26,39 @@ class CaesarConsole(cmd.Cmd):
         for option_info in tool_options.values():
             option_info["value"] = option_info["default"]
 
+    def complete_tool_names(self, text):
+        matches = []
+        for tool_name in self.tools:
+            if tool_name.startswith(text):
+                matches.append(tool_name)
+        return matches
+
+    def complete_option_names(self, text):
+        if self.current_tool is None:
+            return []
+
+        matches = []
+        tool_options = self.get_current_tool()["options"]
+        for option_name in tool_options:
+            if option_name.startswith(text.upper()):
+                matches.append(option_name)
+        return matches
+
+    def format_option_value(self, value):
+        if value is None:
+            return "-"
+        return str(value)
+
+    def print_tool_options(self, tool):
+        print(f"{'OPTION':<30}{'VALUE':<20}REQUIRED")
+        for option_name, option_info in tool["options"].items():
+            required = "yes" if option_info["required"] else "no"
+            value = self.format_option_value(option_info["value"])
+            print(f"{option_name:<30}{value:<20}{required}")
+            description = option_info.get("description", "")
+            if description:
+                print(f"  {description}")
+
     def do_help(self, arg):
         print("Available commands:")
         print("help              - Show this help message")
@@ -48,8 +81,9 @@ class CaesarConsole(cmd.Cmd):
 
     def do_tools(self, arg):
         print("Available tools:")
+        name_width = max(len(tool_name) for tool_name in self.tools)
         for tool_name, tool_info in self.tools.items():
-            print(" - " + tool_name + ": " + tool_info["description"])
+            print(f" - {tool_name:<{name_width}}  {tool_info['description']}")
 
     def do_select(self, arg):
         if(arg.strip() == ""):
@@ -66,6 +100,9 @@ class CaesarConsole(cmd.Cmd):
             print("Tool not found: " + tool)
             print("Use 'tools' command to see available tools.")
 
+    def complete_select(self, text, line, begidx, endidx):
+        return self.complete_tool_names(text)
+
     def do_deselect(self, arg):
         if self.current_tool is None:
             print("No tool is currently selected.")
@@ -81,15 +118,7 @@ class CaesarConsole(cmd.Cmd):
             return False
         print("Options for " + self.current_tool + ":")
         tool = self.get_current_tool()
-        tool_options = tool["options"]
-
-        for option_name, option_info in tool_options.items():
-            required = " (required)" if option_info["required"] else ""
-            value = option_info["value"]
-            print(f" - {option_name:<30}{value}{required}")
-            description = option_info.get("description", "")
-            if description:
-                print(f"   {description}")
+        self.print_tool_options(tool)
 
     def do_set(self, arg):
         if not self.check_if_tool_selected():
@@ -110,6 +139,9 @@ class CaesarConsole(cmd.Cmd):
         else:
             print("Option not found: " + option_name)
             print("Use 'options' command to see available options for the selected tool.")
+
+    def complete_set(self, text, line, begidx, endidx):
+        return self.complete_option_names(text)
     
     def do_unset(self, arg):
         if not self.check_if_tool_selected():
@@ -125,6 +157,9 @@ class CaesarConsole(cmd.Cmd):
         else:
             print("Option not found: " + option_name)
             print("Use 'options' command to see available options for the selected tool.")
+
+    def complete_unset(self, text, line, begidx, endidx):
+        return self.complete_option_names(text)
 
     def do_reset(self, arg):
         if not self.check_if_tool_selected():
@@ -155,13 +190,10 @@ class CaesarConsole(cmd.Cmd):
         print("Description: " + tool["description"])
         print("Entry: " + tool["entry"])
         print("Options:")
-        for option_name, option_info in tool["options"].items():
-            required = " (required)" if option_info["required"] else ""
-            value = option_info["value"]
-            print(f" - {option_name:<30}{value}{required}")
-            description = option_info.get("description", "")
-            if description:
-                print(f"   {description}")
+        self.print_tool_options(tool)
+
+    def complete_info(self, text, line, begidx, endidx):
+        return self.complete_tool_names(text)
 
     def do_run(self, arg):
         if not self.check_if_tool_selected():
@@ -178,10 +210,7 @@ class CaesarConsole(cmd.Cmd):
                 print(" - " + option_name)
             return False
         print("Running " + self.current_tool)
-        print("--------------")
-        for option_name, option_info in tool_options.items():
-            print(option_name + ": " + str(option_info["value"]))
-        print("--------------")
+        self.print_tool_options(tool)
         command = self.build_command_string(tool)
         print("Executing:\n" + " ".join(command))
         try:
