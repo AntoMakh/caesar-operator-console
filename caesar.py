@@ -31,6 +31,7 @@ class CaesarConsole(cmd.Cmd):
         print("help              - Show this help message")
         print("tools             - List available tools")
         print("select <tool>     - Select a tool")
+        print("info <tool>       - Show details for a tool")
         print("deselect          - Deselect current tool")
         print("options           - Show tool options")
         print("set <opt> <val>   - Set option value")
@@ -134,12 +135,16 @@ class CaesarConsole(cmd.Cmd):
     def build_command_string(self, tool):
         command = []
         command.append(tool["entry"])
-        for option_value in tool["options"].values():
+        for option_name in tool["argument_order"]:
+            option_value = tool["options"][option_name]
             if option_value["value"] is not None:
                 command.append(str(option_value["value"]))
         return command
 
     def do_info(self, arg):
+        if arg.strip() == "":
+            print("Usage: info <tool>")
+            return False
         tool = arg.split()[0]
         if tool not in self.tools:
             print("Tool not found: " + tool)

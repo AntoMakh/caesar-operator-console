@@ -17,11 +17,14 @@ def normalize_module(metadata, module_path):
             "description": option_info.get("description", "")
         }
 
+    argument_order = metadata.get("argument_order", list(options.keys()))
+
     return {
         "name": metadata.get("name", ""),
         "description": metadata.get("description", ""),
         "entry": entry_path,
-        "options": options
+        "options": options,
+        "argument_order": argument_order
     }
     
 
@@ -51,6 +54,16 @@ def load_modules(modules_dir = "modules"):
         entry_path = os.path.join(module_path, metadata["entry"])
         if not os.path.isfile(entry_path):
             print(f"[WARNING] Entry script '{metadata['entry']}' not found in '{module_name}'. Skipping.")
+            continue
+
+        invalid_argument_names = [option_name for option_name in metadata.get("argument_order", []) if option_name not in metadata.get("options", {})]
+        if invalid_argument_names:
+            print(f"[WARNING] Module '{module_name}' has invalid argument_order entries: {invalid_argument_names}. Skipping.")
+            continue
+
+        missing_argument_names = [option_name for option_name in metadata.get("options", {}) if option_name not in metadata.get("argument_order", list(metadata.get("options", {}).keys()))]
+        if missing_argument_names:
+            print(f"[WARNING] Module '{module_name}' is missing options in argument_order: {missing_argument_names}. Skipping.")
             continue
 
         tool = normalize_module(metadata, module_path)

@@ -12,5 +12,10 @@
         "FILE": {
             "required": true
         }
-    }
+    },
+        "argument_order": [
+        "HOST",
+        "PORT",
+        "FILE"
+    ]
 }

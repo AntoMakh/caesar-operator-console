@@ -16,5 +16,11 @@
         "required": false,
         "default": "404"
     }
-  }
+  },
+    "argument_order": [
+    "TARGET",
+    "PORT",
+    "WORDLIST",
+    "EXCLUDED_STATUS_CODES"
+  ]
 }

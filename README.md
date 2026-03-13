@@ -69,12 +69,13 @@ Example:
   "name": "example",
   "description": "Example module",
   "entry": "wrapper.sh",
+  "argument_order": ["TARGET", "PORT"],
   "options": {
     "TARGET": {
       "required": true
     },
     "PORT": {
-      "required": false
+      "required": false,
       "default": "80"
     }
   }
@@ -82,6 +83,8 @@ Example:
 ```
 
 The console reads this metadata and automatically exposes the module commands.
+
+The `argument_order` field is optional. If present, it tells Caesar the exact order to pass option values to the module entry script. Every option listed in `options` should also appear in `argument_order`.
 
 ## Basic Usage
 
@@ -101,6 +104,12 @@ Select a tool:
 
 ```caesar
 select napoleon
+```
+
+Display tool information:
+
+```caesar
+info napoleon
 ```
 
 Display required options:
@@ -172,7 +181,6 @@ caesar/
 Planned improvements include:
 
 - Tab completion for commands and options
-- Argument ordering support
 - Improved output formatting
 - Additional reconnaissance modules
 

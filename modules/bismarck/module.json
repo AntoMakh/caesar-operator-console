@@ -9,5 +9,9 @@
         "PORT": {
             "required": false
         }
-    }
+    },
+    "argument_order": [
+        "TARGET",
+        "PORT"
+    ]
 }

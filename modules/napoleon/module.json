@@ -6,5 +6,8 @@
         "DOMAIN": {
             "required": true
         }
-    }
+    },
+    "argument_order": [
+        "DOMAIN"
+    ]
 }
