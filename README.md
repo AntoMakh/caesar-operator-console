@@ -133,6 +133,18 @@ Set option value to blank:
 unset PORT
 ```
 
+Save the current tool settings:
+
+```caesar
+save
+```
+
+Load saved settings for the current tool:
+
+```caesar
+load
+```
+
 Run the selected module:
 
 ```caesar

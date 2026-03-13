@@ -1,10 +1,13 @@
 import cmd
 import subprocess
 from module_loader import load_modules
+import json
+import os
 
 class CaesarConsole(cmd.Cmd):
     intro = "Welcome to the Caesar Operator Console. Type help to list commands.\n"
     prompt = 'caesar > '
+    settings_file = ".caesar_settings.json"
 
     def __init__(self):
         super().__init__()
@@ -59,6 +62,24 @@ class CaesarConsole(cmd.Cmd):
             if description:
                 print(f"  {description}")
 
+    def get_required_unset_options(self, tool):
+        tool_options = tool["options"]
+        required_unset_options = []
+        for option_name, option_info in tool_options.items():
+            if option_info["required"] and option_info["value"] is None:
+                required_unset_options.append(option_name)
+        return required_unset_options
+
+    def load_saved_settings(self):
+        if not os.path.isfile(self.settings_file):
+            return {}
+        with open(self.settings_file, "r") as f:
+            return json.load(f)
+
+    def write_saved_settings(self, data):
+        with open(self.settings_file, "w") as f:
+            json.dump(data, f, indent=4)
+
     def do_help(self, arg):
         print("Available commands:")
         print("help              - Show this help message")
@@ -69,6 +90,8 @@ class CaesarConsole(cmd.Cmd):
         print("options           - Show tool options")
         print("set <opt> <val>   - Set option value")
         print("unset <opt>       - Clear option value")
+        print("save              - Save options of current tool")
+        print("load              - Load saved settings to current tool")
         print("reset             - Reset options to defaults")
         print("run               - Execute tool")
         print("exit              - Exit console")
@@ -195,19 +218,47 @@ class CaesarConsole(cmd.Cmd):
     def complete_info(self, text, line, begidx, endidx):
         return self.complete_tool_names(text)
 
+    def do_save(self, arg):
+        if not self.check_if_tool_selected():
+            return False
+        tool = self.get_current_tool()
+        required_unset_options = self.get_required_unset_options(tool)
+        if required_unset_options:
+            print("Cannot save options. Required options are not set:")
+            for option_name in required_unset_options:
+                print(f" - {option_name}")
+            return False
+        data = self.load_saved_settings()
+        saved_options = {} # create a dictionary of options for currently selected tool
+        for option_name, option_info in tool["options"].items():
+            saved_options[option_name] = option_info["value"]
+        data[self.current_tool] = saved_options # key: tool, value: dictionary containing values of options
+        self.write_saved_settings(data)
+        print(f"Saved settings for {self.current_tool}")
+
+    def do_load(self, arg):
+        if not self.check_if_tool_selected():
+            return False
+        tool = self.get_current_tool()
+        data = self.load_saved_settings()
+        if self.current_tool not in data:
+            print(f"No saved settings found for {self.current_tool}")
+            return False
+        
+        saved_options = data[self.current_tool]
+        for option_name, option_value in saved_options.items():
+            tool["options"][option_name]["value"] = option_value
+        print(f"Loaded settings for {self.current_tool}")
+
     def do_run(self, arg):
         if not self.check_if_tool_selected():
             return False
         tool = self.get_current_tool()
-        tool_options = tool["options"]
-        required_unset_options = []
-        for option_name, option_info in tool_options.items():
-            if option_info["required"] and option_info["value"] is None:
-                required_unset_options.append(option_name)
+        required_unset_options = self.get_required_unset_options(tool)
         if required_unset_options:
             print("Cannot run tool. Required options are not set:")
             for option_name in required_unset_options:
-                print(" - " + option_name)
+                print(f" - {option_name}")
             return False
         print("Running " + self.current_tool)
         self.print_tool_options(tool)
