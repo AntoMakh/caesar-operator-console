@@ -5,7 +5,28 @@ import json
 import os
 
 class CaesarConsole(cmd.Cmd):
-    intro = "Welcome to the Caesar Operator Console. Type help to list commands.\n"
+    intro = """
+WRITTEN BY
+ ________
+/        \\
+| b1smrk |
+\\________/
+                                     |__
+                                     |\\/
+                                     ---
+                                     / | [
+                              !      | |||
+                            _/|     _/|-++'
+                        +  +--|    |--|--|_ |-
+                     { /|__|  |/\\__|  |--- |||__/
+                    +---------------___[}-_===_.'____                 /\\
+                ____`-' ||___-{]_| _[}-  |     |_[___\\==--            \\/   _
+ __..._____--==/___]_|__|_____________________________[___\\==--____,------' .7
+|                                                                          /
+ \\_________________________________________________________________________|
+
+Welcome to the Caesar Operator Console. Type help to list commands.
+"""
     prompt = 'caesar > '
     settings_file = ".caesar_settings.json"
 
