@@ -1,0 +1,29 @@
+{
+    "wordpress": {
+        "headers": {},
+        "body_contains": ["wp-content", "wp-includes", "wp-admin"],
+        "paths": ["/wp-login.php", "/wp-admin/"]
+    },
+    "nginx": {
+        "headers": {
+            "Server": ["nginx", "openresty", "Tengine"]
+        },
+        "body_contains": [],
+        "paths": []
+    },
+    "apache": {
+        "headers": {
+            "Server": ["Apache", "Apache-Coyote"]
+        },
+        "body_contains": [],
+        "paths": []
+    },
+    "php": {
+        "headers": {
+            "Server": ["PHP"],
+            "X-Powered-By": ["PHP"]
+        },
+        "body_contains": [],
+        "paths": []
+    }
+}
