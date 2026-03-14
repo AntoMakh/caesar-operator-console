@@ -8,11 +8,15 @@
             "description": "single hash or path to file containing hashes"
         },
         "WORDLIST": {
-            "required": true
+            "required": true,
+            "type": "file",
+            "must_exist": true
         },
         "HASH_TYPE": {
             "required": true,
-            "default": "md5"
+            "default": "md5",
+            "type": "choice",
+            "choices": ["md5", "sha1", "sha256", "sha512"]
         }
     },
     "argument_order": [

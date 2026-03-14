@@ -105,6 +105,32 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         with open(self.settings_file, "w") as f:
             json.dump(data, f, indent=4)
 
+    def validate_option_value(self, option_name, option_info, option_value):
+        option_type = option_info.get("type", "string")
+
+        if option_type == "string":
+            return True, None
+        elif option_type == "integer":
+            if option_value.isdigit():
+                int_value = int(option_value)
+                min_val = option_info.get("min")
+                max_val = option_info.get("max")
+                if (min_val is not None and int_value < min_val) or (max_val is not None and int_value > max_val):
+                    return False, f"Value must be in the range {min_val} to {max_val}."
+                return True, None
+            return False, "Value must be an integer."
+        elif option_type == "file":
+            if option_info["must_exist"] and not os.path.isfile(option_value):
+                return False, "File does not exist."
+            return True, None
+        elif option_type == "choice":
+            choices = option_info.get("choices", [])
+            if option_value not in choices:
+                return False, f"Value must be one of: {', '.join(choices)}."
+            return True, None
+        else:
+            return False, f"Unknown option type: {option_type}."
+
     def do_help(self, arg):
         print("Available commands:")
         print("help              - Show this help message")
@@ -182,6 +208,10 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         option_value = " ".join(parts[1:])
         tool_options = self.get_current_tool()["options"]
         if option_name in tool_options:
+            is_valid, error_msg = self.validate_option_value(option_name, tool_options[option_name], option_value)
+            if not is_valid:
+                print(f"Invalid value for option '{option_name}': {error_msg}")
+                return False
             tool_options[option_name]["value"] = option_value
             print("Set " + option_name + " to " + option_value)
         else:

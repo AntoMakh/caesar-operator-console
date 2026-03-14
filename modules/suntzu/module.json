@@ -7,10 +7,15 @@
         "required": true
     },
     "PORT": {
-        "required": true
+        "required": true,
+        "type": "integer",
+        "min": 1,
+        "max": 65535
     },
     "WORDLIST": {
-        "required": true
+        "required": true,
+        "type": "file",
+        "must_exist": true
     },
     "EXCLUDED_STATUS_CODES": {
         "required": false,

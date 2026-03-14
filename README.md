@@ -73,15 +73,26 @@ Example:
   "argument_order": ["TARGET", "PORT"],
   "options": {
     "TARGET": {
-      "required": true
+      "required": true,
+      "type": "string"
     },
     "PORT": {
       "required": false,
-      "default": "80"
+      "default": "80",
+      "type": "integer",
+      "min": 1,
+      "max": 65535
     },
     "STATUS_CODES": {
       "required": false,
+      "type": "choice",
+      "choices": ["200", "301", "404"],
       "flag": "--status-codes"
+    },
+    "WORDLIST": {
+      "required": true,
+      "type": "file",
+      "must_exist": true
     }
   }
 }
@@ -94,6 +105,16 @@ The `argument_order` field is optional. If present, it tells Caesar the exact or
 The `flag` field is optional. If present, Caesar passes the option as a flagged argument such as `--status-codes 200,301` instead of a plain positional value.
 
 If an option should start unset, leave out the `default` field. Avoid using empty or whitespace-only strings as default values. Caesar treats those defaults as unset and prints a warning when loading the module.
+
+Caesar also supports optional validation metadata for module options:
+
+- `type`: option type such as `string`, `integer`, `file`, or `choice`
+- `choices`: allowed values for `choice` options
+- `min`: minimum allowed value for `integer` options
+- `max`: maximum allowed value for `integer` options
+- `must_exist`: whether a `file` option must already exist on disk
+
+These validations are enforced by Caesar when the user runs `set`, before the module is executed.
 
 ## Basic Usage
 

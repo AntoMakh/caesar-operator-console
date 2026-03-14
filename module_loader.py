@@ -19,7 +19,12 @@ def normalize_module(metadata, module_path):
             "value": default,
             "default": default,
             "description": option_info.get("description", ""),
-            "flag": option_info.get("flag")
+            "flag": option_info.get("flag"),
+            "type": option_info.get("type", "string"),
+            "choices": option_info.get("choices"),
+            "min": option_info.get("min"),
+            "max": option_info.get("max"),
+            "must_exist": option_info.get("must_exist", False)
         }
 
     argument_order = metadata.get("argument_order", list(options.keys()))

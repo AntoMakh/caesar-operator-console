@@ -7,17 +7,24 @@
             "required": true
         },
         "PORT": {
-            "required": true
+            "required": true,
+            "type": "integer",
+            "min": 1,
+            "max": 65535
         },
         "FILE": {
-            "required": true
+            "required": true,
+            "type": "file",
+            "must_exist": true
         },
         "KEYWORD": {
             "required": true
         },
         "SCHEME": {
             "required": false,
-            "default": "http"
+            "default": "http",
+            "type": "choice",
+            "choices": ["http", "https"]
         }
     },
         "argument_order": [
