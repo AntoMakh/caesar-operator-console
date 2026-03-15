@@ -43,6 +43,10 @@ Directory and endpoint enumeration tool for discovering hidden paths on web serv
 
 Hash cracking utility that performs dictionary attacks against common hash formats.
 
+### Mercator
+
+Certificate transparency enumeration tool that queries `crt.sh` and extracts relevant subdomains for a target domain.
+
 ### Turing
 
 Web technology fingerprinting tool that inspects HTTP response headers and body content to identify likely server software and runtimes. Turing also extracts version information from matching headers when it is present.
@@ -224,6 +228,7 @@ caesar/
     ├── bismarck/
     ├── suntzu/
     ├── davinci/
+    ├── mercator/
     └── turing/
 ```
 
@@ -239,7 +244,6 @@ caesar/
 Planned improvements include:
 
 - Improved output formatting
-- Save and load module option configurations
 - Dependency checks for external tools and scripts
 - Better validation and error messages for module metadata
 - More detailed tool information and help output
