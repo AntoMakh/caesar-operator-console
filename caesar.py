@@ -259,8 +259,11 @@ Welcome to the Caesar Operator Console. Type help to list commands.
 
     def do_info(self, arg):
         if arg.strip() == "":
-            print("Usage: info <tool>")
-            return False
+            if self.check_if_tool_selected():
+             print("Usage: info <tool>")
+             return False
+            else:
+                arg = self.current_tool
         tool = arg.split()[0]
         if tool not in self.tools:
             print("Tool not found: " + tool)
