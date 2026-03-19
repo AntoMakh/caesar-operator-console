@@ -7,9 +7,9 @@ keyword="$4"
 scheme="$5"
 
 address="$host:$port"
-
+script_dir="$(cd "$(dirname "$0")" && pwd)"
 if [ -n "$scheme" ]; then
-    ./modules/judas/judas.sh -f "$file" -k "$keyword" -s "$scheme" "$address"
+    "$script_dir/judas.sh" -f "$file" -k "$keyword" -s "$scheme" "$address"
 else
-    ./modules/judas/judas.sh -f "$file" -k "$keyword" "$address"
+    "$script_dir/judas.sh" -f "$file" -k "$keyword" "$address"
 fi

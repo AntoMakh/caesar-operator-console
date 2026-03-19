@@ -2,9 +2,9 @@
 
 target="$1"
 port="$2"
-
+script_dir="$(cd "$(dirname "$0")" && pwd)"
 if [ -n "$port" ]; then
-    ./modules/bismarck/bismarck.sh -p "$port" "$target"
+    "$script_dir/bismarck.sh" -p "$port" "$target"
 else
-    ./modules/bismarck/bismarck.sh "$target"
+    "$script_dir/bismarck.sh" "$target"
 fi
