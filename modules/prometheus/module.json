@@ -1,0 +1,30 @@
+{
+    "name": "prometheus",
+    "description": "Prometheus SUID/SGID scanner with optional GTFOBins lookup",
+    "entry": "prometheus.sh",
+    "options": {
+        "ROOT_CHECK": {
+            "required": false,
+            "flag": "-r",
+            "type": "boolean",
+            "description": "Scan root directory, else current"
+        },
+        "GTFOBINS_CHECK": {
+            "required": false,
+            "flag": "-g",
+            "type": "boolean",
+            "description": "Online GTFOBins lookup"
+        },
+        "OUTPUT_FILE": {
+            "required": false,
+            "flag": "-o",
+            "type": "string",
+            "description": "Write scan output to a file"
+        }
+    },
+    "argument_order": [
+        "ROOT_CHECK",
+        "GTFOBINS_CHECK",
+        "OUTPUT_FILE"
+    ]
+}

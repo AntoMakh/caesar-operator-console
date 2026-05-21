@@ -51,6 +51,10 @@ Certificate transparency enumeration tool that queries `crt.sh` and extracts rel
 
 Web technology fingerprinting tool that inspects HTTP response headers and body content to identify likely server software and runtimes. Turing also extracts version information from matching headers when it is present.
 
+### Prometheus
+Prometheus scans the filesystem for files with SUID/SGID bits set and optionally performs an online GTFOBins lookup for discovered binaries. It helps quickly identify potentially risky setuid/setgid binaries and highlights known abuse techniques when GTFOBins entries exist.
+
+
 ## Architecture
 
 Caesar follows a modular architecture composed of the following components:
@@ -116,7 +120,7 @@ If an option should start unset, leave out the `default` field. Avoid using empt
 
 Caesar also supports optional validation metadata for module options:
 
-- `type`: option type such as `string`, `integer`, `file`, or `choice`
+- `type`: option type such as `string`, `integer`, `file`, `choice`, or `boolean`
 - `choices`: allowed values for `choice` options
 - `min`: minimum allowed value for `integer` options
 - `max`: maximum allowed value for `integer` options

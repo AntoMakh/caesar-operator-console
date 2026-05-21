@@ -128,6 +128,10 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             if option_value not in choices:
                 return False, f"Value must be one of: {', '.join(choices)}."
             return True, None
+        elif option_type == "boolean":
+            if option_value.lower() in ["true", "yes", "1", "false", "no", "0"]:
+                return True, None
+            return False, "Value must be a boolean (true/false, yes/no, 1/0)."
         else:
             return False, f"Unknown option type: {option_type}."
 
@@ -252,8 +256,18 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             option_info = tool["options"][option_name]
             if option_info["value"] is None: # if not required and set to none
                 continue
-            if option_info.get("flag"): # either required or not required and set, check if has flag (should be for optional options)
-                command.append(option_info["flag"])
+
+            flag = option_info.get("flag")
+            type = option_info.get("type", "string")
+
+            if flag and type == "boolean": # if boolean flag and set to true, add flag to command, if false skip
+                val = option_info["value"]
+                if val.lower() in ["true", "yes", "1"]:
+                    command.append(flag)
+                continue
+
+            if flag: # either required or not required and set, check if has flag (should be for optional options)
+                command.append(flag)
             command.append(str(option_info["value"]))
         return command
 
