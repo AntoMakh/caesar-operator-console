@@ -37,37 +37,64 @@ def load_signatures():
     with open(signature_database_path, "r") as f:
         return json.load(f)
 
-def detect_technologies(evidence, signatures):
+def match_evidence(source_name, evidence, signatures):
+    matches = []
+    for header_name, possible_header_values in signatures.get("headers", {}).items():
+        if header_name in evidence.get("headers", {}):
+            found_header_value = evidence["headers"][header_name]
+            for possible_header_value in possible_header_values:
+                if possible_header_value.lower() in found_header_value.lower():
+                    matches.append({
+                        "matched_source": source_name,
+                        "matched_header": header_name,
+                        "matched_value": possible_header_value
+                    })
+
+    for keyword in signatures.get("body_contains", []):
+        if keyword.lower() in evidence.get("body", "").lower():
+            matches.append({
+                "matched_source": source_name,
+                "matched_header": None,
+                "matched_value": keyword
+            })
+
+    return matches if matches else None
+
+def detect_technologies(evidence, path_evidence, signatures):
     findings = []
 
     for technology, rules in signatures.items():
-        matched = False
+        main_match = match_evidence("main_page", evidence, rules)
+        if main_match:
+            for match in main_match:
+                findings.append({
+                        "technology": technology,
+                        "matched_source": match["matched_source"],
+                        "matched_header": match["matched_header"],
+                        "matched_value": match["matched_value"]
+                    })
 
-        for header_name, possible_header_values in rules.get("headers", {}).items():
-            if header_name in evidence["headers"]:
-                found_header_value = evidence["headers"][header_name]
-                for possible_header_value in possible_header_values:
-                    if possible_header_value.lower() in found_header_value.lower():
-                        findings.append({
-                            "technology": technology,
-                            "matched_header": header_name,
-                            "matched_value": possible_header_value
-                        })
-                        matched = True
-                        break
-                if matched:
-                    break
-        if matched:
-            continue
+        for path, path_info in path_evidence.items():
+            if path_info is None:
+                continue
 
-        for keyword in rules.get("body_contains", []):
-            if keyword.lower() in evidence["body"].lower():
+            if path in rules.get("paths", []) and path_info.get("status_code") == 200:
                 findings.append({
                     "technology": technology,
+                    "matched_source": f"path: {path}",
                     "matched_header": None,
-                    "matched_value": keyword
+                    "matched_value": path
                 })
-                break
+
+            path_match = match_evidence(f"path: {path}", path_info, signatures)
+            if path_match:
+                findings.append({
+                    "technology": main_match["matched_value"],
+                    "matched_source": path_match["matched_source"],
+                    "matched_header": path_match["matched_header"],
+                    "matched_value": path_match["matched_value"]
+                })
+
     return findings
 
 def detect_technology_version(findings, evidence):
@@ -94,6 +121,26 @@ def detect_technology_version(findings, evidence):
         })
     return results
 
+def collect_path_evidence(base_url, paths):
+    path_evidence = {}
+
+    for path in paths:
+        try:
+            response = requests.get(f"{base_url}/{path}", timeout=3)
+            path_evidence[path] = {
+                "status_code": response.status_code,
+                "headers": dict(response.headers),
+                "body": response.text
+            }
+        except requests.RequestException:
+            path_evidence[path] = {
+                "status_code": None,
+                "headers": {},
+                "body": ""
+            }
+
+    return path_evidence
+
 def collect_evidence(response):
     return {
         "status_code": response.status_code,
@@ -111,8 +158,16 @@ def main():
         response = requests.get(base_url, timeout=3)
         evidence = collect_evidence(response)
         signatures = load_signatures()
+
+        all_paths = []
+        for rules in signatures.values():
+            all_paths.extend(rules.get("paths", []))
+        all_paths = list(set(all_paths))
+        
+        path_evidence = collect_path_evidence(base_url, all_paths)
+
         print(json.dumps(evidence["headers"], indent=4))
-        findings = detect_technologies(evidence, signatures)
+        findings = detect_technologies(evidence, path_evidence, signatures)
         findings_with_versions = detect_technology_version(findings, evidence)
         print("\n[+] Detected Technologies:")
         for finding in findings_with_versions:
