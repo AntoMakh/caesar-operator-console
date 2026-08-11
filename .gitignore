@@ -3,3 +3,4 @@ __pycache__/
 .caesar_settings.json
 .github/
 .agents/
+outputs/

@@ -3,6 +3,7 @@ import subprocess
 from module_loader import load_modules
 import json
 import os
+from module_runner import run_module_and_log
 
 try:
     import readline
@@ -93,11 +94,11 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         return str(value)
 
     def print_tool_options(self, tool):
-        print(f"{'OPTION':<30}{'VALUE':<20}REQUIRED")
+        print(f"{'OPTION':<25}{'VALUE':<40}REQUIRED")
         for option_name, option_info in tool["options"].items():
             required = "yes" if option_info["required"] else "no"
             value = self.format_option_value(option_info["value"])
-            print(f"{option_name:<30}{value:<20}{required}")
+            print(f"{option_name:<25}{value:<40}{required}")
             description = option_info.get("description", "")
             if description:
                 print(f"  {description}")
@@ -418,14 +419,9 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         self.print_tool_options(tool)
         command = self.build_command_string(tool)
         print(f"[*] Executing:\n{' '.join(command)}")
-        try:
-            subprocess.run(command, check=True)
-        except subprocess.CalledProcessError:
-            print("[!] Tool execution failed.")
-        except FileNotFoundError:
-            print("[!] Module entry file not found.")
-        except Exception as e:
-            print(f"[!] An error occurred: {e}")
+        print("-" * 50)
+        run_module_and_log(self.current_tool, command)
+
             
 
 if __name__ == '__main__':
