@@ -26,5 +26,8 @@
         "ROOT_CHECK",
         "GTFOBINS_CHECK",
         "OUTPUT_FILE"
+    ],
+    "dependencies": [
+        "find"
     ]
 }

@@ -33,5 +33,6 @@
     "WORDLIST",
     "EXCLUDED_STATUS_CODES",
     "EXTENSIONS"
-  ]
+  ],
+  "dependencies": []
 }

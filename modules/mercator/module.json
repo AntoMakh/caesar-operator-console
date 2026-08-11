@@ -7,5 +7,6 @@
             "required": true
         }
     },
-    "argument_order": ["TARGET"]
+    "argument_order": ["TARGET"],
+    "dependencies": []
 }

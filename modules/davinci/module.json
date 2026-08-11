@@ -23,5 +23,8 @@
         "HASH",
         "WORDLIST",
         "HASH_TYPE"
+    ],
+    "dependencies": [
+        "hashcat"
     ]
 }

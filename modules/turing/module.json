@@ -13,5 +13,6 @@
             "max": 65535
         }
     },
-    "argument_order": ["TARGET", "PORT"]
+    "argument_order": ["TARGET", "PORT"],
+    "dependencies": []
 }

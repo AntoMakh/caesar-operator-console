@@ -4,6 +4,7 @@ from module_loader import load_modules
 import json
 import os
 from module_runner import run_module_and_log
+import shutil
 
 try:
     import readline
@@ -168,6 +169,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         print("save              - Save options of current tool")
         print("load              - Load saved settings to current tool")
         print("reset             - Reset options to defaults")
+        print("check             - Check if module dependencies are met")
         print("run               - Execute tool")
         print("exit              - Exit console")
         print("setg <opt> <val>  - Set a global option value")
@@ -262,6 +264,24 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         print(f"[+] Global option {option_name} => {option_value}")
 
         self.apply_global_options()        
+
+    def do_check(self, arg):
+        if not self.check_if_tool_selected():
+            return False
+        tool = self.get_current_tool()
+        dependencies = tool.get("dependencies", [])
+
+        all_met = True
+        for dependency in dependencies:
+            binary_path = shutil.which(dependency)
+            if not binary_path:
+                print("[-] Missing dependency: "+dependency+". Please install it to run module.")
+                all_met = False
+
+        if all_met:
+            print(f"[+] All module dependencies met for {self.current_tool}.")
+        else:
+            return False
 
     def complete_set(self, text, line, begidx, endidx):
         return self.complete_option_names(text)
@@ -420,6 +440,8 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         command = self.build_command_string(tool)
         print(f"[*] Executing:\n{' '.join(command)}")
         print("-" * 50)
+        if self.do_check(None) is False:
+            return False
         run_module_and_log(self.current_tool, command)
 
             

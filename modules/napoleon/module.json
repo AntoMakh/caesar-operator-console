@@ -9,5 +9,8 @@
     },
     "argument_order": [
         "DOMAIN"
+    ],
+    "dependencies": [
+        "host"
     ]
 }

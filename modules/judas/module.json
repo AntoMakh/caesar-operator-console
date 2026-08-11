@@ -33,5 +33,9 @@
         "FILE",
         "KEYWORD",
         "SCHEME"
+    ],
+    "dependencies": [
+        "curl",
+        "grep"
     ]
 }
