@@ -48,7 +48,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
 
     def check_if_tool_selected(self):
         if self.current_tool is None:
-            print("No tool is currently selected. Use 'select <tool>' to select a tool.")
+            print("[!] No tool is currently selected. Use 'select <tool>' to select a tool.")
             return False
         return True
 
@@ -117,7 +117,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             with open(self.settings_file, "r") as f:
                 return json.load(f)
         except json.JSONDecodeError:
-            print("Saved settings file is invalid. Loading empty settings.")
+            print("[!] Saved settings file is invalid. Loading empty settings.")
             return {}
 
     def write_saved_settings(self, data):
@@ -174,7 +174,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         print("goptions          - Show global options")
 
     def do_exit(self, arg):
-        print("Exiting the Caesar Operator Console. Goodbye!")
+        print("[*] Exiting the Caesar Operator Console. Goodbye!")
         return True
     def default(self, arg):
         print("Unknown command: " + arg +". Type 'help' to see available commands.")
@@ -187,7 +187,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
 
     def do_select(self, arg):
         if(arg.strip() == ""):
-            print("Usage: select <tool>")
+            print("[!] Usage: select <tool>")
             return False
         tool = arg.split()[0]
         if self.current_tool:
@@ -195,10 +195,10 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         if tool in self.tools:
             self.current_tool = tool
             self.apply_global_options()
-            print("Selected tool: " + tool)
+            print(f"[+] Selected tool: {tool}")
             self.prompt = 'caesar (' + tool + ') > '
         else:
-            print("Tool not found: " + tool)
+            print(f"[!] Tool not found: {tool}")
             print("Use 'tools' command to see available tools.")
 
     def complete_select(self, text, line, begidx, endidx):
@@ -206,9 +206,9 @@ Welcome to the Caesar Operator Console. Type help to list commands.
 
     def do_deselect(self, arg):
         if self.current_tool is None:
-            print("No tool is currently selected.")
+            print("[!] No tool is currently selected.")
         else:
-            print("Deselected tool: " + self.current_tool)
+            print(f"[-] Deselected tool: {self.current_tool}")
             tool = self.get_current_tool()
             self.reset_options()
             self.current_tool = None
@@ -225,11 +225,11 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         if not self.check_if_tool_selected():
             return False
         if(arg.strip() == ""):
-            print("Usage: set <option> <value>")
+            print("[!] Usage: set <option> <value>")
             return False
         parts = arg.split()
         if(len(parts) < 2):
-            print("Usage: set <option> <value>")
+            print("[!] Usage: set <option> <value>")
             return False
         option_name = parts[0].upper()
         option_value = " ".join(parts[1:])
@@ -237,21 +237,21 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         if option_name in tool_options:
             is_valid, error_msg = self.validate_option_value(option_name, tool_options[option_name], option_value)
             if not is_valid:
-                print(f"Invalid value for option '{option_name}': {error_msg}")
+                print(f"[!] Invalid value for option '{option_name}': {error_msg}")
                 return False
             tool_options[option_name]["value"] = option_value
-            print("Set " + option_name + " to " + option_value)
+            print(f"[+] Set {option_name} => {option_value}")
         else:
-            print("Option not found: " + option_name)
+            print(f"[!] Option not found: {option_name}")
             print("Use 'options' command to see available options for the selected tool.")
 
     def do_setg(self, arg):
         if not arg.strip():
-            print("Usage: setg <option> <value>")
+            print("[!] Usage: setg <option> <value>")
             return False
         parts = arg.split()
         if len(parts) < 2:
-            print("Usage: setg <option> <value>")
+            print("[!] Usage: setg <option> <value>")
             return False
 
         option_name = parts[0].upper()
@@ -275,20 +275,20 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         if not self.check_if_tool_selected():
             return False
         if(arg.strip() == ""):
-            print("Usage: unset <option>")
+            print("[!] Usage: unset <option>")
             return False
         option_name = arg.split()[0].upper()
         tool_options = self.get_current_tool()["options"]
         if option_name in tool_options:
             tool_options[option_name]["value"] = None
-            print("Unset " + option_name)
+            print(f"[-] Unset local option {option_name}")
         else:
-            print("Option not found: " + option_name)
+            print(f"[!] Option not found: {option_name}")
             print("Use 'options' command to see available options for the selected tool.")
 
     def do_unsetg(self, arg):
         if not arg.strip():
-            print("Usage: unsetg <option>")
+            print("[!] Usage: unsetg <option>")
             return False
             
         option_name = arg.split()[0].upper()
@@ -316,7 +316,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         if not self.check_if_tool_selected():
             return False
         self.reset_options()
-        print("Reset all options to default values.")
+        print("[-] Reset all options to default values.")
 
     def do_goptions(self, arg):
         print("Global Options:")
@@ -353,13 +353,13 @@ Welcome to the Caesar Operator Console. Type help to list commands.
     def do_info(self, arg):
         if arg.strip() == "":
             if not self.check_if_tool_selected():
-                print("Usage: info <tool>")
+                print("[!] Usage: info <tool>")
                 return False
             else:
                 arg = self.current_tool
         tool = arg.split()[0]
         if tool not in self.tools:
-            print("Tool not found: " + tool)
+            print(f"[!] Tool not found: {tool}")
             print("Use 'tools' command to see available tools.")
             return False
         tool = self.tools[tool]
@@ -378,7 +378,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         tool = self.get_current_tool()
         required_unset_options = self.get_required_unset_options(tool)
         if required_unset_options:
-            print("Cannot save options. Required options are not set:")
+            print("[!] Cannot save options. Required options are not set:")
             for option_name in required_unset_options:
                 print(f" - {option_name}")
             return False
@@ -388,7 +388,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             saved_options[option_name] = option_info["value"]
         data[self.current_tool] = saved_options # key: tool, value: dictionary containing values of options
         self.write_saved_settings(data)
-        print(f"Saved settings for {self.current_tool}")
+        print(f"[+] Saved settings for {self.current_tool}")
 
     def do_load(self, arg):
         if not self.check_if_tool_selected():
@@ -396,13 +396,13 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         tool = self.get_current_tool()
         data = self.load_saved_settings()
         if self.current_tool not in data:
-            print(f"No saved settings found for {self.current_tool}")
+            print(f"[!] No saved settings found for {self.current_tool}")
             return False
         
         saved_options = data[self.current_tool]
         for option_name, option_value in saved_options.items():
             tool["options"][option_name]["value"] = option_value
-        print(f"Loaded settings for {self.current_tool}")
+        print(f"[+] Loaded settings for {self.current_tool}")
 
     def do_run(self, arg):
         if not self.check_if_tool_selected():
@@ -410,14 +410,14 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         tool = self.get_current_tool()
         required_unset_options = self.get_required_unset_options(tool)
         if required_unset_options:
-            print("Cannot run tool. Required options are not set:")
+            print("[!] Cannot run tool. Required options are not set:")
             for option_name in required_unset_options:
                 print(f" - {option_name}")
             return False
-        print("Running " + self.current_tool)
+        print("[*] Running " + self.current_tool)
         self.print_tool_options(tool)
         command = self.build_command_string(tool)
-        print("Executing:\n" + " ".join(command))
+        print(f"[*] Executing:\n{' '.join(command)}")
         try:
             subprocess.run(command, check=True)
         except subprocess.CalledProcessError:
