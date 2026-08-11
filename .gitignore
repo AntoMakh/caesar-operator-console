@@ -2,3 +2,4 @@ __pycache__/
 *.pyc
 .caesar_settings.json
 .github/
+.agents/

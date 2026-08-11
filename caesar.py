@@ -4,6 +4,15 @@ from module_loader import load_modules
 import json
 import os
 
+try:
+    import readline
+except ImportError:
+    try:
+        import pyreadline3 as readline
+    except ImportError:
+        readline = None
+
+
 class CaesarConsole(cmd.Cmd):
     intro = """
 WRITTEN BY
@@ -33,6 +42,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
     def __init__(self):
         super().__init__()
         self.tools = load_modules()
+        self.global_options = {}
 
     current_tool = None
 
@@ -45,10 +55,19 @@ Welcome to the Caesar Operator Console. Type help to list commands.
     def get_current_tool(self):
         return self.tools[self.current_tool]
 
+    def apply_global_options(self):
+        if self.current_tool is None:
+            return
+        tool_options = self.get_current_tool()["options"]
+        for option_name, global_value in self.global_options.items():
+            if option_name in tool_options:
+                tool_options[option_name]["value"] = global_value
+
     def reset_options(self):
         tool_options = self.get_current_tool()["options"]
         for option_info in tool_options.values():
             option_info["value"] = option_info["default"]
+        self.apply_global_options()
 
     def complete_tool_names(self, text):
         matches = []
@@ -150,6 +169,9 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         print("reset             - Reset options to defaults")
         print("run               - Execute tool")
         print("exit              - Exit console")
+        print("setg <opt> <val>  - Set a global option value")
+        print("unsetg <opt>      - Clear a global option value")
+        print("goptions          - Show global options")
 
     def do_exit(self, arg):
         print("Exiting the Caesar Operator Console. Goodbye!")
@@ -172,6 +194,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             self.reset_options()
         if tool in self.tools:
             self.current_tool = tool
+            self.apply_global_options()
             print("Selected tool: " + tool)
             self.prompt = 'caesar (' + tool + ') > '
         else:
@@ -222,9 +245,32 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             print("Option not found: " + option_name)
             print("Use 'options' command to see available options for the selected tool.")
 
+    def do_setg(self, arg):
+        if not arg.strip():
+            print("Usage: setg <option> <value>")
+            return False
+        parts = arg.split()
+        if len(parts) < 2:
+            print("Usage: setg <option> <value>")
+            return False
+
+        option_name = parts[0].upper()
+        option_value = " ".join(parts[1:])
+
+        self.global_options[option_name] = option_value
+        print(f"[+] Global option {option_name} => {option_value}")
+
+        self.apply_global_options()        
+
     def complete_set(self, text, line, begidx, endidx):
         return self.complete_option_names(text)
     
+    def complete_setg(self, text, line, begidx, endidx):
+        all_options = set()
+        for tool_info in self.tools.values():
+            all_options.update(tool_info["options"].keys())
+        return [opt for opt in all_options if opt.startswith(text.upper())]
+
     def do_unset(self, arg):
         if not self.check_if_tool_selected():
             return False
@@ -240,14 +286,47 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             print("Option not found: " + option_name)
             print("Use 'options' command to see available options for the selected tool.")
 
+    def do_unsetg(self, arg):
+        if not arg.strip():
+            print("Usage: unsetg <option>")
+            return False
+            
+        option_name = arg.split()[0].upper()
+        
+        if option_name in self.global_options:
+            old_val = self.global_options[option_name]
+            del self.global_options[option_name]
+            print(f"[-] Unset global option {option_name}")
+            
+            for tool_name, tool_info in self.tools.items():
+                if option_name in tool_info["options"]:
+                    if tool_info["options"][option_name]["value"] == old_val:
+                        tool_info["options"][option_name]["value"] = tool_info["options"][option_name]["default"]
+        else:
+            print(f"[!] Global option {option_name} is not set.")
+
+
     def complete_unset(self, text, line, begidx, endidx):
         return self.complete_option_names(text)
+
+    def complete_unsetg(self, text, line, begidx, endidx):
+        return [opt for opt in self.global_options.keys() if opt.startswith(text.upper())]
 
     def do_reset(self, arg):
         if not self.check_if_tool_selected():
             return False
         self.reset_options()
         print("Reset all options to default values.")
+
+    def do_goptions(self, arg):
+        print("Global Options:")
+        if not self.global_options:
+            print("  No global options set.")
+            return
+        print(f"{'OPTION':<30}{'VALUE':<20}")
+        print("-" * 50)
+        for opt, val, in self.global_options.items():
+            print(f"{opt:<30}{val:<20}")
 
     def build_command_string(self, tool):
         command = []
