@@ -4,7 +4,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-def run_module_and_log(tool_name, command, output_dir="outputs"):
+def run_module_and_log(tool_name, command, output_dir="outputs", background=False):
     os.makedirs(output_dir, exist_ok=True)
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     formatted_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -18,6 +18,29 @@ def run_module_and_log(tool_name, command, output_dir="outputs"):
         command = [sys.executable] + command
     elif entry_path.endswith(".sh"):
         command = ["bash"] + command
+
+    if background:
+        log_file = open(log_path, "w", encoding="utf-8")
+        log_file.write("=" * 60 + "\n")
+        log_file.write("CAESAR OPERATOR CONSOLE EXECUTION LOG (BACKGROUND JOB)\n")
+        log_file.write(f"Tool      : {tool_name}\n")
+        log_file.write(f"Timestamp : {formatted_date}\n")
+        log_file.write(f"Command   : {' '.join(command)}\n")
+        log_file.write("=" * 60 + "\n\n")
+        log_file.flush()
+
+        # idk weird fix to use less cpu and avoid cli lag, might remove later
+        creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
+        process = subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            text=True,
+            creationflags=creationflags
+        )
+        return process, log_path
 
     captured_lines = []
 

@@ -45,6 +45,8 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         super().__init__()
         self.tools = load_modules()
         self.global_options = {}
+        self.jobs = {}
+        self.job_counter = 1
 
     current_tool = None
 
@@ -170,7 +172,10 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         print("load              - Load saved settings to current tool")
         print("reset             - Reset options to defaults")
         print("check             - Check if module dependencies are met")
-        print("run               - Execute tool")
+        print("run [-b]          - Execute tool (pass -b for background)")
+        print("jobs              - List background jobs")
+        print("output <job_id>   - View output of a background job")
+        print("kill <job_id>     - Terminate a running background job")
         print("exit              - Exit console")
         print("setg <opt> <val>  - Set a global option value")
         print("unsetg <opt>      - Clear a global option value")
@@ -442,9 +447,74 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         print("-" * 50)
         if self.do_check(None) is False:
             return False
-        run_module_and_log(self.current_tool, command)
 
+        is_background = "-b" in arg.split()
+        if is_background:
+            process, log_path = run_module_and_log(self.current_tool, command, background=True)
+            job_id = self.job_counter
+            self.jobs[job_id] = {
+                "id": job_id,
+                "tool": self.current_tool,
+                "status": "Running",
+                "log_path": log_path,
+                "process": process
+            }
+            self.job_counter += 1
+            print(f"[+] Started background job [{job_id}] for {self.current_tool}")
+        else:
+            run_module_and_log(self.current_tool, command, background=False)
+
+    def do_jobs(self,arg):
+        if not self.jobs:
+            print("  No background jobs.")
+            return
+        
+        print(f"{'JOB_ID':<10}{'TOOL':<20}{'STATUS':<15}{'LOG FILE':<40}")
+        print("-" * 85)
+        for job_id, job in self.jobs.items():
+            if job["status"] == "Running":
+                if job["process"].poll() is not None:
+                    job["status"] = "Finished"
+            print(f"[{job_id}]       {job['tool']:<20}{job['status']:<15}{job['log_path']:<40}")
             
+    def do_output(self, arg):
+        if not arg.strip():
+            print("[!] Usage: output <job_id>")
+            return
+        try:
+            job_id = int(arg.strip())
+            if job_id not in self.jobs:
+                print(f"[!] Job [{job_id}] not found.")
+                return
+            log_path = self.jobs[job_id]["log_path"]
+            if os.path.exists(log_path):
+                print(f"--- Output for Job [{job_id}] ({self.jobs[job_id]['tool']}) ---")
+                with open(log_path, "r", encoding="utf-8") as f:
+                    print(f.read())
+            else:
+                print(f"[!] Log file not found: {log_path}")
+        except ValueError:
+            print("[!] Job ID must be an integer.")
+
+    def do_kill(self, arg):
+        if not arg.strip():
+            print("[!] Usage: kill <job_id>")
+            return
+        try:
+            job_id = int(arg.strip())
+            if job_id not in self.jobs:
+                print(f"[!] Job [{job_id}] not found.")
+                return
+            job = self.jobs[job_id]
+            if job["process"].poll() is None:
+                job["process"].kill()
+                job["status"] = "Terminated"
+                print(f"[-] Terminated job [{job_id}] ({job['tool']}).")
+            else:
+                print(f"[!] Job [{job_id}] is already finished.")
+        except ValueError:
+            print("[!] Job ID must be an integer.")
+
 
 if __name__ == '__main__':
     CaesarConsole().cmdloop()
