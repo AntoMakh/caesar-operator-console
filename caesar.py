@@ -635,4 +635,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
 
 
 if __name__ == '__main__':
-    CaesarConsole().cmdloop()
+    try:
+        CaesarConsole().cmdloop()
+    except KeyboardInterrupt:
+        print("\n[*] Exiting the Caesar Operator Console. Goodbye!")

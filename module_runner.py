@@ -17,7 +17,7 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
     command[0] = entry_path
 
     if entry_path.endswith(".py"):
-        command = [sys.executable] + command
+        command = [sys.executable, "-u"] + command
     elif entry_path.endswith(".sh"):
         command = ["bash"] + command
 
@@ -75,6 +75,31 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
             f.writelines(captured_lines)
 
         print(f"[+] Execution log saved to {log_path}")
+    except KeyboardInterrupt:
+        print("\n[-] Execution interrupted by user.")
+        if process:
+            if os.name == "nt":
+                subprocess.run(
+                    f"taskkill /pid {process.pid} /F /T",
+                    shell=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+            else:
+                process.kill()
+            try:
+                process.wait(timeout=1)
+            except Exception:
+                pass
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write("=" * 60 + "\n")
+            f.write("CAESAR OPERATOR CONSOLE EXECUTION LOG\n")
+            f.write(f"Tool      : {tool_name}\n")
+            f.write(f"Timestamp : {formatted_date}\n")
+            f.write(f"Command   : {' '.join(command)}\n")
+            f.write("=" * 60 + "\n\n")
+            f.writelines(captured_lines)
+        print(f"[!] Partial execution log saved to {log_path}")
 
     except FileNotFoundError:
         print("[!] Module entry file not found.")

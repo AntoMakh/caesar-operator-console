@@ -202,11 +202,11 @@ def main():
         print(f"Error: {base_url} seems to be down or is blocking requests.")
         sys.exit(1)
 
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_THREADS) as executor:
-        futures = [
-            executor.submit(scan_directory, base_url, directory, status_codes, STATUS_WIDTH, markers) for directory in lines
-        ]
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_THREADS)
+    futures = [
+        executor.submit(scan_directory, base_url, directory, status_codes, STATUS_WIDTH, markers) for directory in lines
+    ]
+    try:
         for future in concurrent.futures.as_completed(futures):
             counter += 1
             result = future.result()
@@ -215,6 +215,10 @@ def main():
             if counter % progress_interval == 0:
                 with print_lock:
                     print(f"Progress: {counter}/{total}")
+    except KeyboardInterrupt:
+        executor.shutdown(wait=False, cancel_futures=True)
+        print(f"\n{RED}[!] Directory enumeration interrupted by user.{RESET}")
+        sys.exit(130)
 
     print("Directory enumeration completed.")
     print("Summary:")

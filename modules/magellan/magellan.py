@@ -71,15 +71,21 @@ def main():
     print(f"[*] Starting DNS enumeration on {target_domain} using {args.WORDLIST}")
     print(f"[*] Total words to check: {total} | Threads running: {max_threads}\n")
     print("-" * 60)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
-        futures = [
-            executor.submit(resolve_subdomain, word, target_domain) for word in subdomain_words
-        ]
+
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_threads)
+    futures = [
+        executor.submit(resolve_subdomain, word, target_domain) for word in subdomain_words
+    ]
+    try:
         for future in concurrent.futures.as_completed(futures):
             result = future.result()
             if result is not None:
                 discovered.append(result)
-        
+    except KeyboardInterrupt:
+        # cancel all pending items in the queue and do not wait for workers
+        executor.shutdown(wait=False, cancel_futures=True)
+        print(f"\n{RED}[!] Enumeration interrupted by user.{RESET}")
+        sys.exit(130)
     print("-" * 60)
     print(f"{GREEN}[+] DNS enumeration completed.{RESET}")
     print(f"[*] Discovered subdomains: {len(discovered)} / {total}")
