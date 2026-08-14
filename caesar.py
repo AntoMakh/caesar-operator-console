@@ -1,3 +1,4 @@
+import time
 from typing import Optional, Dict, Any, List, Tuple
 import cmd
 import subprocess
@@ -468,12 +469,29 @@ Welcome to the Caesar Operator Console. Type help to list commands.
                 "status": "Running",
                 "log_path": log_path,
                 "process": process,
-                "timer": None
+                "timer": None,
+                "start_time": time.time(),
+                "end_time": None
             }
+            watcher = threading.Thread(target=self._watch_job, args=(job_id, process), daemon=True)
+            watcher.start()
             self.job_counter += 1
             print(f"[+] Started background job [{job_id}] for {self.current_tool}")
         else:
             run_module_and_log(self.current_tool, command, background=False)
+
+    def _watch_job(self, job_id: int, process: subprocess.Popen) -> None:
+        """watcher that gets end time of subprocess (job) running in backgroud"""
+        process.wait()
+        if job_id in self.jobs:
+            job = self.jobs[job_id]
+            if job["status"] == "Running":
+                job["status"] = "Finished"
+                job["end_time"] = time.time()
+                if job.get("timer"):
+                    job["timer"].cancel()
+                    job["timer"] = None
+
 
     def do_timeout(self, arg):
         parts = arg.split()
@@ -543,14 +561,25 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             print("  No background jobs.")
             return
         
-        print(f"{'JOB_ID':<10}{'TOOL':<20}{'STATUS':<15}{'LOG FILE':<40}")
-        print("-" * 85)
+        print(f"{'JOB_ID':<10}{'TOOL':<18}{'STATUS':<14}{'DURATION':<12}{'LOG FILE':<40}")
+        print("-" * 95)
         for job_id, job in self.jobs.items():
-            if job["status"] == "Running":
-                if job["process"].poll() is not None:
-                    job["status"] = "Finished"
-            print(f"[{job_id}]       {job['tool']:<20}{job['status']:<15}{job['log_path']:<40}")
-            
+            end_time = job["end_time"] if job["end_time"] else time.time()
+            duration_str = self._format_duration(end_time - job["start_time"])
+
+            print(f"[{job_id}]       {job['tool']:<18}{job['status']:<14}{duration_str:<12}{job['log_path']:<40}")
+    
+    def _format_duration(self, seconds: float) -> str:
+        total_seconds = int(seconds)
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        secs = total_seconds % 60
+        if hours > 0:
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        return f"{minutes:02d}:{secs:02d}"
+
+
+
     def do_output(self, arg):
         """display execution log output for a background job."""
         if not arg.strip():
@@ -585,8 +614,10 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             if job["process"].poll() is None:
                 job["process"].kill()
                 job["status"] = "Terminated"
+                job["end_time"] = time.time()
                 if job.get("timer"):
                     job["timer"].cancel()
+                    job["timer"] = None
                 print(f"[-] Terminated job [{job_id}] ({job['tool']}).")
             else:
                 print(f"[!] Job [{job_id}] is already finished.")
@@ -600,6 +631,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             if job["process"].poll() is None:
                 job["process"].kill()
                 job["status"] = "Timed Out"
+                job["end_time"] = time.time()
 
 
 if __name__ == '__main__':
