@@ -6,6 +6,8 @@ import json
 import os
 from module_runner import run_module_and_log
 import shutil
+import threading
+
 
 try:
     import readline
@@ -165,26 +167,28 @@ Welcome to the Caesar Operator Console. Type help to list commands.
 
     def do_help(self, arg):
         print("Available commands:")
-        print("help              - Show this help message")
-        print("tools             - List available tools")
-        print("select <tool>     - Select a tool")
-        print("info <tool>       - Show details for a tool")
-        print("deselect          - Deselect current tool")
-        print("options           - Show tool options")
-        print("set <opt> <val>   - Set option value")
-        print("unset <opt>       - Clear option value")
-        print("save              - Save options of current tool")
-        print("load              - Load saved settings to current tool")
-        print("reset             - Reset options to defaults")
-        print("check             - Check if module dependencies are met")
-        print("run [-b]          - Execute tool (pass -b for background)")
-        print("jobs              - List background jobs")
-        print("output <job_id>   - View output of a background job")
-        print("kill <job_id>     - Terminate a running background job")
-        print("exit              - Exit console")
-        print("setg <opt> <val>  - Set a global option value")
-        print("unsetg <opt>      - Clear a global option value")
-        print("goptions          - Show global options")
+        print("help                   - Show this help message")
+        print("tools                  - List available tools")
+        print("select <tool>          - Select a tool")
+        print("info <tool>            - Show details for a tool")
+        print("deselect               - Deselect current tool")
+        print("options                - Show tool options")
+        print("set <opt> <val>        - Set option value")
+        print("unset <opt>            - Clear option value")
+        print("save                   - Save options of current tool")
+        print("load                   - Load saved settings to current tool")
+        print("reset                  - Reset options to defaults")
+        print("check                  - Check if module dependencies are met")
+        print("run [-b]               - Execute tool (pass -b for background)")
+        print("timeout <job_id> <sec> - Add timer to kill backgrond job")
+        print("untimeout <job_id>     - Remove timer from job")
+        print("jobs                   - List background jobs")
+        print("output <job_id>        - View output of a background job")
+        print("kill <job_id>          - Terminate a running background job")
+        print("exit                   - Exit console")
+        print("setg <opt> <val>       - Set a global option value")
+        print("unsetg <opt>           - Clear a global option value")
+        print("goptions               - Show global options")
 
     def do_exit(self, arg):
         print("[*] Exiting the Caesar Operator Console. Goodbye!")
@@ -463,12 +467,75 @@ Welcome to the Caesar Operator Console. Type help to list commands.
                 "tool": self.current_tool,
                 "status": "Running",
                 "log_path": log_path,
-                "process": process
+                "process": process,
+                "timer": None
             }
             self.job_counter += 1
             print(f"[+] Started background job [{job_id}] for {self.current_tool}")
         else:
             run_module_and_log(self.current_tool, command, background=False)
+
+    def do_timeout(self, arg):
+        parts = arg.split()
+        if len(parts) != 2:
+            print("[!] Usage: timeout <job_id> <time in seconds>")
+            return
+
+        try:
+            job_id = int(parts[0])
+            seconds = int(parts[1])
+        except ValueError:
+            print("[!] Job ID and timeout seconds must both be positive integers")
+            return
+
+        if seconds <= 0:
+            print("[!] Timeout duration must be a positive integer.")
+            return
+
+        if job_id not in self.jobs:
+            print("[!] Job ID must be a valid id. Run 'jobs' to list valid job IDs")
+            return
+
+        job = self.jobs[job_id]
+        if job["status"] != "Running":
+            print("[!] Job is already finished.")
+            return
+
+        if job["timer"] is not None:
+            print("[!] Timer already exists for selected job.")
+            return
+
+        timer = threading.Timer(seconds, self._timeout_job, args=[job_id])
+        timer.daemon = True
+        timer.start()
+        job["timer"] = timer
+        print(f"[+] Timer of {seconds} seconds set for job {job_id} ({job['tool']}).")
+
+    def do_untimeout(self, arg):
+        if not arg.strip():
+            print("[!] Usage: untimeout <job_id>")
+            return
+
+        parts = arg.split()
+
+        try:
+            job_id = int(parts[0])
+        except ValueError:
+            print("[!] Job ID must be a positive integer.")
+            return
+
+        if job_id not in self.jobs:
+            print("[!] Job ID must be a valid id. Run 'jobs' to list valid job IDs")
+            return
+        
+        job = self.jobs[job_id]
+        if job["timer"] is None:
+            print(f"[!] Job {job_id} does not have an active timer.")
+            return
+        
+        job["timer"].cancel()
+        job["timer"] = None
+        print(f"[-] Removed timeout for job {job_id}.")
 
     def do_jobs(self,arg):
         """list active and completed background jobs."""
@@ -518,11 +585,21 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             if job["process"].poll() is None:
                 job["process"].kill()
                 job["status"] = "Terminated"
+                if job.get("timer"):
+                    job["timer"].cancel()
                 print(f"[-] Terminated job [{job_id}] ({job['tool']}).")
             else:
                 print(f"[!] Job [{job_id}] is already finished.")
         except ValueError:
             print("[!] Job ID must be an integer.")
+
+    def _timeout_job(self, job_id: int) -> None:
+        """calls kill when job timer expires"""
+        if job_id in self.jobs:
+            job = self.jobs[job_id]
+            if job["process"].poll() is None:
+                job["process"].kill()
+                job["status"] = "Timed Out"
 
 
 if __name__ == '__main__':
