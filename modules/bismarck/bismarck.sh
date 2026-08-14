@@ -1,5 +1,9 @@
 #! /bin/bash
 
+# THIS MODULE IS A PROOF-OF-CONCEPT DEVELOPED FOR UNIVERSITY COURSEWORK. IT IS EXTREMELY
+# INEFFICIENT AND HAS CAUSED ME A SLEEPLESS NIGHT OF DEBUGGING BECAUSE OF WEIRD INTERRUPT SIGNALS
+# NOT BEING PICKED UP PROPERLY.
+
 # WRITTEN BY
 #  ________
 # /        \
@@ -18,6 +22,8 @@
 #  __..._____--==/___]_|__|_____________________________[___\==--____,------' .7
 # |                                                                          /
 #  \_________________________________________________________________________|
+
+trap "echo ''; exit 130" SIGINT SIGTERM
 
 port_provided=''
 
@@ -49,14 +55,23 @@ fi
 is_open() {
 	local ip="$1"
 	local port="$2"
-	nc -nvz "$ip" "$port" 2>/dev/null
+	nc -vz "$ip" "$port" 2>/dev/null
 	# netcat returns 0 if connection is open, 1 if closed/filtered (can check this with 'echo $?')
+	local status=$?
+    if [ $status -gt 128 ] || [ $status -eq 2 ]; then
+        exit 130
+    fi
+    return $status
 }
 
 grab_banner() {
 	local ip="$1"
 	local port="$2"
-	timeout 0.2 nc -nv "$ip" "$port" </dev/null
+	nc -v "$ip" "$port" </dev/null
+	local status=$?
+	if [ $status -gt 128 ] || [ $status -eq 2 ]; then
+        exit 130
+    fi
 }
 
 
