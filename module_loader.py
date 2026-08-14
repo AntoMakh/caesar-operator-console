@@ -1,9 +1,29 @@
+from typing import TypedDict, Dict, List, Optional, Any
 import os
 import json
 
-# im actually gonna comment this, it's 3:56 AM and i can barely understand
+class OptionSchema(TypedDict, total=False):
+    required: bool
+    value: Any
+    default: Any
+    description: str
+    flag: Optional[str]
+    type: str
+    choices: Optional[List[str]]
+    min: Optional[int]
+    max: Optional[int]
+    must_exist: bool
 
-def normalize_module(metadata, module_path):
+class ToolSchema(TypedDict, total=False):
+    name: str
+    description: str
+    entry: str
+    options: Dict[str, OptionSchema]
+    argument_order: List[str]
+    dependencies: List[str]
+
+def normalize_module(metadata: dict, module_path: str) -> ToolSchema:
+    """normalize raw metadata into runtime tool format."""
     # here, we modify to match runtime structure needed for caesar.py
     entry_path = os.path.join(module_path, metadata["entry"])
 
@@ -40,7 +60,8 @@ def normalize_module(metadata, module_path):
 
 
 
-def load_modules(modules_dir = "modules"):
+def load_modules(modules_dir: str = "modules") -> Dict[str, ToolSchema]:
+    """load and validate all tool metadata schemas from the modules directory."""
     tools = {}
     for module_name in os.listdir(modules_dir): # for each folder in modules
         module_path = os.path.join(modules_dir, module_name) # get path to each module

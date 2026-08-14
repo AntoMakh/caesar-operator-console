@@ -1,10 +1,12 @@
+from typing import Tuple, Union
 import os
 import sys
 import subprocess
 from datetime import datetime
 from pathlib import Path
 
-def run_module_and_log(tool_name, command, output_dir="outputs", background=False):
+def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs", background: bool = False) -> Union[Tuple[subprocess.Popen, str], None]:
+    """execute tool process, stream live output, and save structured execution log."""
     os.makedirs(output_dir, exist_ok=True)
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     formatted_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

@@ -1,6 +1,7 @@
+from typing import Optional, Dict, Any, List, Tuple
 import cmd
 import subprocess
-from module_loader import load_modules
+from module_loader import load_modules, ToolSchema, OptionSchema
 import json
 import os
 from module_runner import run_module_and_log
@@ -50,16 +51,19 @@ Welcome to the Caesar Operator Console. Type help to list commands.
 
     current_tool = None
 
-    def check_if_tool_selected(self):
+    def check_if_tool_selected(self) -> bool:
+        """verify if a tool is currently selected in console."""
         if self.current_tool is None:
             print("[!] No tool is currently selected. Use 'select <tool>' to select a tool.")
             return False
         return True
 
-    def get_current_tool(self):
+    def get_current_tool(self) -> ToolSchema:
+        """retrieve metadata dictionary of currently selected tool."""
         return self.tools[self.current_tool]
 
-    def apply_global_options(self):
+    def apply_global_options(self) -> None:
+        """apply global environment option values to current tool options."""
         if self.current_tool is None:
             return
         tool_options = self.get_current_tool()["options"]
@@ -67,20 +71,21 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             if option_name in tool_options:
                 tool_options[option_name]["value"] = global_value
 
-    def reset_options(self):
+    def reset_options(self) -> None:
+        """reset option values for current tool back to defaults."""
         tool_options = self.get_current_tool()["options"]
         for option_info in tool_options.values():
             option_info["value"] = option_info["default"]
         self.apply_global_options()
 
-    def complete_tool_names(self, text):
+    def complete_tool_names(self, text: str) -> List[str]:
         matches = []
         for tool_name in self.tools:
             if tool_name.startswith(text):
                 matches.append(tool_name)
         return matches
 
-    def complete_option_names(self, text):
+    def complete_option_names(self, text: str) -> List[str]:
         if self.current_tool is None:
             return []
 
@@ -91,12 +96,12 @@ Welcome to the Caesar Operator Console. Type help to list commands.
                 matches.append(option_name)
         return matches
 
-    def format_option_value(self, value):
+    def format_option_value(self, value: Any) -> str:
         if value is None:
             return "-"
         return str(value)
 
-    def print_tool_options(self, tool):
+    def print_tool_options(self, tool: ToolSchema) -> None:
         print(f"{'OPTION':<25}{'VALUE':<40}REQUIRED")
         for option_name, option_info in tool["options"].items():
             required = "yes" if option_info["required"] else "no"
@@ -106,7 +111,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             if description:
                 print(f"  {description}")
 
-    def get_required_unset_options(self, tool):
+    def get_required_unset_options(self, tool: ToolSchema) -> List[str]:
         tool_options = tool["options"]
         required_unset_options = []
         for option_name, option_info in tool_options.items():
@@ -114,7 +119,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
                 required_unset_options.append(option_name)
         return required_unset_options
 
-    def load_saved_settings(self):
+    def load_saved_settings(self) -> Dict[str, Any]:
         if not os.path.isfile(self.settings_file):
             return {}
         try:
@@ -124,11 +129,11 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             print("[!] Saved settings file is invalid. Loading empty settings.")
             return {}
 
-    def write_saved_settings(self, data):
+    def write_saved_settings(self, data: Dict[str, Any]) -> None:
         with open(self.settings_file, "w") as f:
             json.dump(data, f, indent=4)
 
-    def validate_option_value(self, option_name, option_info, option_value):
+    def validate_option_value(self, option_name: str, option_info: OptionSchema, option_value: str) -> Tuple[bool, Optional[str]]:
         option_type = option_info.get("type", "string")
 
         if option_type == "string":
@@ -271,6 +276,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         self.apply_global_options()        
 
     def do_check(self, arg):
+        """check if required system dependencies exist for selected tool."""
         if not self.check_if_tool_selected():
             return False
         tool = self.get_current_tool()
@@ -354,14 +360,13 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         for opt, val, in self.global_options.items():
             print(f"{opt:<30}{val:<20}")
 
-    def build_command_string(self, tool):
+    def build_command_string(self, tool: ToolSchema) -> List[str]:
         command = []
         command.append(tool["entry"])
         for option_name in tool["argument_order"]:
             option_info = tool["options"][option_name]
             if option_info["value"] is None: # if not required and set to none
                 continue
-
             flag = option_info.get("flag")
             type = option_info.get("type", "string")
 
@@ -431,6 +436,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         print(f"[+] Loaded settings for {self.current_tool}")
 
     def do_run(self, arg):
+        """execute selected tool in foreground or background mode."""
         if not self.check_if_tool_selected():
             return False
         tool = self.get_current_tool()
@@ -465,6 +471,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             run_module_and_log(self.current_tool, command, background=False)
 
     def do_jobs(self,arg):
+        """list active and completed background jobs."""
         if not self.jobs:
             print("  No background jobs.")
             return
@@ -478,6 +485,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             print(f"[{job_id}]       {job['tool']:<20}{job['status']:<15}{job['log_path']:<40}")
             
     def do_output(self, arg):
+        """display execution log output for a background job."""
         if not arg.strip():
             print("[!] Usage: output <job_id>")
             return
@@ -497,6 +505,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             print("[!] Job ID must be an integer.")
 
     def do_kill(self, arg):
+        """terminate a running background job by job id."""
         if not arg.strip():
             print("[!] Usage: kill <job_id>")
             return

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from logging import exception
+from typing import Optional, Tuple, List
 import argparse
 import os
 import requests
@@ -18,23 +19,26 @@ BLUE = "\033[36m"
 RESET = "\033[0m"
 
 def parse_arguments():
+    """parse command line arguments for magellan."""
     parser = argparse.ArgumentParser(description="Magellan DNS Subdomain Enumeration")
     parser.add_argument("DOMAIN", help="Target root domain (e.g. example.com)")
     parser.add_argument("WORDLIST", help="Path to subdomain wordlist")
     parser.add_argument("--threads", dest="THREADS", default="10", help="Number of worker threads")
     return parser.parse_args()
 
-def clean_domain(domain):
-    # need to strip scheme and trailing slashes
+def clean_domain(domain: str) -> str:
+    """strip http/https scheme and trailing slashes from target domain."""
     domain = domain.replace("http://", "").replace("https://", "").strip("/")
     return domain
 
-def validate_wordlist(path):
+def validate_wordlist(path: str) -> None:
+    """verify that subdomain wordlist file exists."""
     if not os.path.isfile(path):
         print(f"{RED}[!] Error: wordlist not found at {path}{RESET}")
         sys.exit(1)
 
-def resolve_subdomain(subdomain, domain):
+def resolve_subdomain(subdomain: str, domain: str) -> Optional[Tuple[str, str]]:
+    """perform dns resolution for a single subdomain candidate."""
     domain_name = f"{subdomain}.{domain}"
 
     try:
