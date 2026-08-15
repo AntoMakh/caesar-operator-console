@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import time
 import argparse
 import os
 import requests
@@ -22,8 +23,6 @@ MARK_REDIRECT = f"{YELLOW}[~]{RESET}"
 MARK_FORBIDDEN = f"{BLUE}[!]{RESET}"
 MARK_OTHER = f"{RED}[-]{RESET}"
 
-MAX_THREADS = 20
-
 SUMMARY_LABELS = {
     "success": "200 responses",
     "redirect": "Redirects",
@@ -43,6 +42,8 @@ def parse_arguments():
     parser.add_argument("WORDLIST", help="Path to the wordlist file")
     parser.add_argument("--exclude-codes", dest="EXCLUDED_STATUS_CODES", default="", help="Status codes to exclude from results separated by commas (e.g., 404,403)")
     parser.add_argument("--extensions", dest="EXTENSIONS", default="", help="File extensions to append to each word (e.g., .php,html,js,.txt)")
+    parser.add_argument("--threads", dest="THREADS", type=int, default=10, help="Number of concurrent worker threads")
+    parser.add_argument("--delay", dest="DELAY", type=float, default=0.0, help="Delay in seconds between requests per threads")
     return parser.parse_args()
 
 def validate_wordlist(path):
@@ -105,7 +106,10 @@ def has_file_extension(path):
 
 
 
-def scan_directory(base_url, directory, status_codes, STATUS_WIDTH, markers):
+def scan_directory(base_url, directory, status_codes, STATUS_WIDTH, markers, delay=0.0):
+    if delay > 0:
+        time.sleep(delay)
+
     url = f"{base_url}/{directory}"
 
     session = get_session()
@@ -202,9 +206,9 @@ def main():
         print(f"Error: {base_url} seems to be down or is blocking requests.")
         sys.exit(1)
 
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=MAX_THREADS)
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=args.THREADS)
     futures = [
-        executor.submit(scan_directory, base_url, directory, status_codes, STATUS_WIDTH, markers) for directory in lines
+        executor.submit(scan_directory, base_url, directory, status_codes, STATUS_WIDTH, markers, args.DELAY) for directory in lines
     ]
     try:
         for future in concurrent.futures.as_completed(futures):

@@ -1,38 +1,53 @@
 {
-  "name": "suntzu",
-  "description": "Directory enumeration tool",
-  "entry": "suntzu.py",
-  "options": {
-    "TARGET": {
-        "required": true
+    "name": "suntzu",
+    "description": "Directory enumeration tool",
+    "entry": "suntzu.py",
+    "options": {
+        "TARGET": {
+            "required": true
+        },
+        "PORT": {
+            "required": true,
+            "type": "integer",
+            "min": 1,
+            "max": 65535
+        },
+        "WORDLIST": {
+            "required": true,
+            "type": "file",
+            "must_exist": true
+        },
+        "EXCLUDED_STATUS_CODES": {
+            "required": false,
+            "default": "404",
+            "flag": "--exclude-codes"
+        },
+        "EXTENSIONS": {
+            "required": false,
+            "flag": "--extensions"
+        },
+        "THREADS": {
+            "required": false,
+            "default": 10,
+            "type": "integer",
+            "min": 1,
+            "max": 100,
+            "flag": "--threads"
+        },
+        "DELAY": {
+            "required": false,
+            "default": 0,
+            "flag": "--delay"
+        }
     },
-    "PORT": {
-        "required": true,
-        "type": "integer",
-        "min": 1,
-        "max": 65535
-    },
-    "WORDLIST": {
-        "required": true,
-        "type": "file",
-        "must_exist": true
-    },
-    "EXCLUDED_STATUS_CODES": {
-        "required": false,
-        "default": "404",
-        "flag": "--exclude-codes"
-    },
-    "EXTENSIONS": {
-        "required": false,
-        "flag": "--extensions"
-    }
-  },
     "argument_order": [
-    "TARGET",
-    "PORT",
-    "WORDLIST",
-    "EXCLUDED_STATUS_CODES",
-    "EXTENSIONS"
-  ],
-  "dependencies": []
+        "TARGET",
+        "PORT",
+        "WORDLIST",
+        "EXCLUDED_STATUS_CODES",
+        "EXTENSIONS",
+        "THREADS",
+        "DELAY"
+    ],
+    "dependencies": []
 }
