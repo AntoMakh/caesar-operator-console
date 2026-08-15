@@ -2,7 +2,7 @@
 
 Caesar is a modular command-line operator console designed to centralize multiple reconnaissance and analysis tools under a unified interface.
 
-The console allows users to dynamically load tools, configure parameters, and execute them from a single interactive environment.
+The console allows users to dynamically load tools, configure parameters, manage background jobs with timeouts, and execute them from a single interactive environment.
 
 ## Overview
 
@@ -12,68 +12,56 @@ Each tool is implemented as a module with a metadata file describing its interfa
 
 ## Features
 
-- Interactive operator console
-- Automatic module discovery
-- Modular tool architecture
-- Support for tools written in multiple languages
-- Option management for module parameters
-- Tab completion for commands, tools, and options
-- Wrapper support for integrating legacy tools
-- Consistent command interface
+- **Interactive Operator Console**: Clean, responsive REPL powered by Python's `cmd` framework with full readline support.
+- **Automatic Module Discovery**: Schema-driven discovery from `modules/*/module.json`.
+- **Background Job Management**: Asynchronous tool execution (`run -b`) with live process tracking, auto-kill countdown timers (`timeout`), and duration monitoring.
+- **Real-Time Streaming & Logging**: Unbuffered real-time stdout streaming and automatic structured log persistence under `outputs/`.
+- **Interruption & Partial Log Retention**: Graceful Ctrl+C signal handling that terminates process trees cleanly and preserves partial intelligence logs.
+- **Global & Local Options**: Flexible option management with global environment variables (`setg`/`unsetg`) and schema validation.
+- **Dependency Verification**: Pre-flight system binary dependency checks (`check`) powered by `shutil.which`.
+- **Tab Completion**: Context-aware autocompletion for commands, tools, options, and global settings.
 
 ## Current Modules
 
 ### Bismarck
-
 Service banner grabbing utility that scans ports and attempts to identify services by retrieving their banners.
 
 ### Napoleon
-
 DNS zone transfer tester that attempts to retrieve DNS records from misconfigured name servers.
 
 ### Judas
-
 Directory-based web content scanner that searches for keywords such as flags within discovered resources.
 
 ### SunTzu
-
-Directory and endpoint enumeration tool for discovering hidden paths on web servers using wordlists. Supports optional file extensions and prints a final summary of scan results.
+Directory and endpoint enumeration tool for discovering hidden paths on web servers using multi-threaded HTTP requests and wordlists. Supports optional file extensions and prints a final summary of scan results.
 
 ### DaVinci
-
 Hash cracking utility that performs dictionary attacks against common hash formats.
 
 ### Mercator
-
 Certificate transparency enumeration tool that queries `crt.sh` and extracts relevant subdomains for a target domain.
 
 ### Turing
-
 Web technology fingerprinting tool that inspects HTTP response headers and body content to identify likely server software and runtimes. Turing also extracts version information from matching headers when it is present.
 
 ### Prometheus
-Prometheus scans the filesystem for files with SUID/SGID bits set and optionally performs an online GTFOBins lookup for discovered binaries. It helps quickly identify potentially risky setuid/setgid binaries and highlights known abuse techniques when GTFOBins entries exist.
+Scans the filesystem for files with SUID/SGID bits set and optionally performs an online GTFOBins lookup for discovered binaries to identify potential privilege escalation abuse techniques.
 
+### Magellan
+Multi-threaded DNS subdomain enumeration tool that brute-forces subdomain candidates using wordlists with responsive interrupt handling.
 
 ## Architecture
 
 Caesar follows a modular architecture composed of the following components:
 
-- Console
-- Module Loader
-- Tool Registry
-- Option Manager
-- Module Execution Layer
-
-Modules are stored inside the `modules/` directory. Each module contains:
-
-- A script or executable implementing the tool
-- A `module.json` metadata file
-- Optionally a wrapper script used to adapt the tool to Caesar's interface
+- **Console Interface (`caesar.py`)**: REPL layer, command routing, state tracking, and background job orchestration.
+- **Module Loader (`module_loader.py`)**: Schema validation, module discovery, and option type checking.
+- **Module Execution Layer (`module_runner.py`)**: Subprocess execution, unbuffered streaming I/O, process tree signal management, and output logging.
+- **Modules (`modules/`)**: Individual security utilities implementing CLI tools in Python, Bash, or external binaries.
 
 ## Module Format
 
-Each module must define a `module.json` file describing its interface.
+Each module defines a `module.json` file describing its interface.
 
 Example:
 
@@ -83,6 +71,7 @@ Example:
   "description": "Example module",
   "entry": "wrapper.sh",
   "argument_order": ["TARGET", "PORT"],
+  "dependencies": ["nc"],
   "options": {
     "TARGET": {
       "required": true,
@@ -110,162 +99,131 @@ Example:
 }
 ```
 
-The console reads this metadata and automatically exposes the module commands.
+### Schema Specification & Rules
 
-The `argument_order` field is optional. If present, it tells Caesar the exact order to pass option values to the module entry script. Every option listed in `options` should also appear in `argument_order`.
+- **`entry`**: The script or wrapper file to execute (e.g. `suntzu.py`, `wrapper.sh`).
+- **`dependencies`**: Optional list of external system binaries (e.g. `nc`, `host`, `curl`) required to run the module. Checked pre-execution via `check`.
+- **`argument_order`**: Optional list defining the exact positional argument order passed to the tool entrypoint.
+- **`options`**: Dictionary defining configurable parameters. Each option supports:
+  - `required` *(bool)*: Whether the option must have a value before `run` or `save` can proceed.
+  - `default` *(any)*: Initial value loaded when the module is selected or reset.
+    > [!IMPORTANT]
+    > If an option should start unset, **omit the `default` field** or set it to `null`. Avoid using empty strings (`""`) or whitespace strings as defaults; Caesar treats them as unset and prints a warning during module load.
+  - `flag` *(string)*: If specified, passes the option as a named flag (e.g. `--status-codes 200,301`) instead of a positional value.
+  - `type` *(string)*: Type enforcement during `set`. Supported types:
+    - `string`: Any text value.
+    - `integer`: Validates whole numbers. Supports optional `min` and `max` bounds.
+    - `file`: Validates file paths. If `must_exist: true`, checks that the target file exists on disk.
+    - `choice`: Restricts input to values listed in the `choices` array.
+    - `boolean`: Accepts `true`/`false`, `yes`/`no`, or `1`/`0`.
 
-The `flag` field is optional. If present, Caesar passes the option as a flagged argument such as `--status-codes 200,301` instead of a plain positional value.
+---
 
-If an option should start unset, leave out the `default` field. Avoid using empty or whitespace-only strings as default values. Caesar treats those defaults as unset and prints a warning when loading the module.
+## Command Reference
 
-Caesar also supports optional validation metadata for module options:
-
-- `type`: option type such as `string`, `integer`, `file`, `choice`, or `boolean`
-- `choices`: allowed values for `choice` options
-- `min`: minimum allowed value for `integer` options
-- `max`: maximum allowed value for `integer` options
-- `must_exist`: whether a `file` option must already exist on disk
-
-These validations are enforced by Caesar when the user runs `set`, before the module is executed.
-
-## Basic Usage
-
-Start the console:
-
-```bash
-python caesar.py
-```
-
-Use the Tab key to autocomplete commands, tool names, and option names inside the console.
-
-List available tools:
+### Tool Selection & Configuration
 
 ```caesar
-tools
+tools                 - List all available modules
+select <tool>         - Select a module
+info [tool]           - Display metadata, description, and options for a tool
+deselect              - Deselect current module
+options               - Display current module options and values
+set <opt> <val>       - Set an option value for the current tool
+unset <opt>           - Clear an option value
+save                  - Save current tool options to local settings (.caesar_settings.json)
+load                  - Load saved options for current tool
+reset                 - Reset current options to defaults
 ```
 
-Select a tool:
+### Global Environment Options
 
 ```caesar
-select napoleon
+setg <opt> <val>      - Set a global option value applied across all tools
+unsetg <opt>          - Clear a global option value
+goptions              - Show all active global options
 ```
 
-Display tool information:
+### Execution & Background Jobs
 
 ```caesar
-info napoleon
+check                 - Check if required system dependencies are installed
+run                   - Execute tool in foreground (streaming output)
+run -b                - Execute tool asynchronously in the background
+jobs                  - List active and completed background jobs with elapsed duration
+output <job_id>       - View output log of a background job
+timeout <id> <sec>    - Set an auto-kill countdown timer on a background job
+untimeout <job_id>    - Remove an active countdown timer from a job
+kill <job_id>         - Immediately terminate a running background job
+exit                  - Exit the Caesar operator console
 ```
 
-Display required options:
+---
 
+## Usage Examples
+
+### 1. Basic Scan Execution
 ```caesar
-options
+caesar > select magellan
+[+] Selected tool: magellan
+caesar (magellan) > set DOMAIN example.com
+[+] Set DOMAIN => example.com
+caesar (magellan) > set WORDLIST /path/to/subdomains.txt
+[+] Set WORDLIST => /path/to/subdomains.txt
+caesar (magellan) > check
+[+] All module dependencies met for magellan.
+caesar (magellan) > run
 ```
 
-Set option values:
-
+### 2. Background Jobs & Timeout Management
 ```caesar
-set DOMAIN example.com
+caesar (suntzu) > run -b
+[+] Started background job [1] for suntzu
+caesar (suntzu) > timeout 1 30
+[+] Timer of 30 seconds set for job 1 (suntzu).
+caesar (suntzu) > jobs
+JOB_ID    TOOL              STATUS        DURATION    LOG FILE                                
+-----------------------------------------------------------------------------------------------
+[1]       suntzu            Running       00:14       outputs\suntzu_20260815_014202.log
 ```
 
-Set option value to blank:
-
-```caesar
-unset PORT
-```
-
-Set optional file extensions for SunTzu:
-
-```caesar
-set EXTENSIONS php,html,txt
-```
-
-SunTzu prints a final summary after the scan showing total requests and grouped result counts.
-
-Save the current tool settings:
-
-```caesar
-save
-```
-
-Load saved settings for the current tool:
-
-```caesar
-load
-```
-
-Run the selected module:
-
-```caesar
-run
-```
-
-Deselect the current tool:
-
-```caesar
-deselect
-```
-
-Reset tool settings to default:
-
-```caesar
-reset
-```
-
-Exit the console:
-
-```caesar
-exit
-```
+---
 
 ## Directory Structure
 
 ```markdown
 caesar/
 │
-├── caesar.py
-├── module_loader.py
+├── caesar.py               # Main operator console REPL
+├── module_loader.py        # Schema parser and validator
+├── module_runner.py        # Process executor and log manager
+├── outputs/                # Structured execution logs
 │
 └── modules/
-    ├── napoleon/
-    ├── judas/
-    ├── bismarck/
-    ├── suntzu/
-    ├── davinci/
-    ├── mercator/
-    └── turing/
+    ├── bismarck/           # Banner grabbing module
+    ├── davinci/            # Hash cracker module
+    ├── judas/              # Content keyword scanner
+    ├── magellan/           # DNS subdomain enumerator
+    ├── mercator/           # Certificate transparency enumerator
+    ├── napoleon/           # DNS zone transfer tester
+    ├── prometheus/         # SUID/SGID binary scanner & GTFOBins
+    ├── suntzu/             # Directory enumeration tool
+    └── turing/             # Web technology fingerprinting tool
 ```
 
 ## Design Goals
 
-- Maintain a simple and extensible architecture
-- Allow integration of tools written in different languages
-- Provide a consistent interface for running reconnaissance utilities
-- Support incremental addition of new modules
-
-## Future Development
-
-Planned improvements include:
-
-- Improved output formatting
-- Dependency checks for external tools and scripts
-- Better validation and error messages for module metadata
-- More detailed tool information and help output
-- Cleaner run output and command preview display
-- Additional reconnaissance modules
+- **Extensibility & Decoupling**: Isolate tool development from core console mechanics. Tools only require an executable and a declarative `module.json` metadata file.
+- **Language Agnostic Interoperability**: Support tools implemented in Python, Bash, or standalone compiled binaries via clean subprocess wrappers.
+- **Lightweight Architecture**: Rely on standard library capabilities (`cmd`, `subprocess`, `threading`, `shutil`) rather than heavy external frameworks.
+- **Operator Safety & Usability**: Enforce defensive bounds validation, clear feedback, interruption handlers, and automatic log retention.
 
 ## Future Tools in Development
 
-### Magellan
-
-Subdomain enumeration tool that brute-forces subdomains using DNS queries and wordlists.
-
 ### Hannibal
-
 Network host discovery tool designed to identify live hosts on a network through scanning techniques.
 
 ### Tesla
-
 Packet inspection utility for lightweight network traffic monitoring during reconnaissance.
 
 ## License
