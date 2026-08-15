@@ -99,6 +99,9 @@ Welcome to the Caesar Operator Console. Type help to list commands.
                 matches.append(option_name)
         return matches
 
+    def complete_follow(self, text, line, begidx, endidx):
+        return [str(job_id) for job_id in self.jobs.keys() if str(job_id).startswith(text)]
+
     def format_option_value(self, value: Any) -> str:
         if value is None:
             return "-"
@@ -181,6 +184,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         print("reset                  - Reset options to defaults")
         print("check                  - Check if module dependencies are met")
         print("run [-b]               - Execute tool (pass -b for background)")
+        print("follow <job_id>        - Follow output of background job")
         print("timeout <job_id> <sec> - Add timer to kill backgrond job")
         print("untimeout <job_id>     - Remove timer from job")
         print("jobs                   - List background jobs")
@@ -492,6 +496,51 @@ Welcome to the Caesar Operator Console. Type help to list commands.
                     job["timer"].cancel()
                     job["timer"] = None
 
+    def do_follow(self, arg):
+        """attach to a running background job and print its output live."""
+        if not arg.strip():
+            print("[!] Usage: follow <job_id>")
+            return
+
+        try:
+            job_id = int(arg.strip())
+            if job_id not in self.jobs:
+                print(f"[!] Job {job_id} not found. Run 'jobs' to list valid IDs.")
+                return
+            self._follow_job_output(job_id)
+        except ValueError:
+            print("[!] Job ID must be an integer.")
+        
+    def _follow_job_output(self, job_id: int) -> None:
+        """stream live output for background job until completiton or user cancellation"""
+        job = self.jobs[job_id]
+        log_path = job["log_path"]
+
+        if not os.path.exists(log_path):
+            print(f"[!] Log file not found: {log_path}")
+            return
+
+        print(f"[*] Following output for job {job_id} ({job['tool']}). Press Ctrl+C to detach.")
+        print("-" * 60)
+
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                while True:
+                    chunk = f.readline()
+                    
+                    if chunk:
+                        print(chunk, end="", flush=True)
+                    else:
+                        if job["status"] != "Running":
+                            remaining = f.read()
+                            if remaining:
+                                print(remaining, end="", flush=True)
+                            break
+                        time.sleep(0.2)
+            print("\n" + "-" * 60)
+            print(f"[*] Job {job_id} has {job['status'].lower()}.")
+        except KeyboardInterrupt:
+            print(f"[-] Detached from job {job_id}. Job continues running in background.")
 
     def do_timeout(self, arg):
         parts = arg.split()
