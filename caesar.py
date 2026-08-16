@@ -8,6 +8,7 @@ import os
 from module_runner import run_module_and_log
 import shutil
 import threading
+from pipeline_engine import PipelineEngine
 
 
 try:
@@ -51,6 +52,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         self.global_options = {}
         self.jobs = {}
         self.job_counter = 1
+        self.pipeline_engine = PipelineEngine()
 
     current_tool = None
 
@@ -682,6 +684,13 @@ Welcome to the Caesar Operator Console. Type help to list commands.
                 job["status"] = "Timed Out"
                 job["end_time"] = time.time()
 
+    def do_pipeline(self, arg):
+        parts = arg.strip().split()
+        if not parts or parts[0] == "list":
+            for workflow, workflow_items in self.pipeline_engine.workflows.items():
+                print(f"- {workflow}")
+                for stage in workflow_items["stages"]:
+                    print(f"\t{stage["tool"]:<15}{stage["name"]}")
 
 if __name__ == '__main__':
     try:

@@ -1,0 +1,30 @@
+{
+    "workflow_name": "web_recon",
+    "required_inputs": [
+        "TARGET",
+        "PORT",
+        "WORDLIST"
+    ],
+    "stages": [
+        {
+            "name": "enumerate_directories",
+            "tool": "suntzu",
+            "options": {
+                "TARGET": "{{TARGET}}",
+                "PORT": "{{PORT}}",
+                "WORDLIST": "{{WORDLIST}}",
+                "QUIET": true
+            },
+            "output": "saved_directories"
+        },
+        {
+            "name": "fingerprint_directories",
+            "tool": "turing",
+            "iterate_over": "saved_directories",
+            "options": {
+                "TARGET": "{{TARGET}}/{{item}}",
+                "PORT": "{{PORT}}"
+            }
+        }
+    ]
+}
