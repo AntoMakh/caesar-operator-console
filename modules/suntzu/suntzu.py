@@ -44,6 +44,7 @@ def parse_arguments():
     parser.add_argument("--extensions", dest="EXTENSIONS", default="", help="File extensions to append to each word (e.g., .php,html,js,.txt)")
     parser.add_argument("--threads", dest="THREADS", type=int, default=10, help="Number of concurrent worker threads")
     parser.add_argument("--delay", dest="DELAY", type=float, default=0.0, help="Delay in seconds between requests per threads")
+    parser.add_argument("--quiet", dest="QUIET", action="store_true", help="Turn on quiet mode for pipelining")
     return parser.parse_args()
 
 def validate_wordlist(path):
@@ -106,7 +107,7 @@ def has_file_extension(path):
 
 
 
-def scan_directory(base_url, directory, status_codes, STATUS_WIDTH, markers, delay=0.0):
+def scan_directory(base_url, directory, status_codes, STATUS_WIDTH, markers, delay=0.0, quiet=False):
     if delay > 0:
         time.sleep(delay)
 
@@ -137,10 +138,14 @@ def scan_directory(base_url, directory, status_codes, STATUS_WIDTH, markers, del
 
         location = response.headers.get("Location", "")
         with print_lock:
-            if location:
-                print(f"{marker} {response.status_code:<{STATUS_WIDTH}}{directory} -> {location}")
+            if quiet:
+                if result == "success":
+                    print(directory)
             else:
-                print(f"{marker} {response.status_code:<{STATUS_WIDTH}}{directory}")
+                if location:
+                    print(f"{marker} {response.status_code:<{STATUS_WIDTH}}{directory} -> {location}")
+                else:
+                    print(f"{marker} {response.status_code:<{STATUS_WIDTH}}{directory}")
         return result
 
     except requests.exceptions.Timeout:
@@ -181,8 +186,9 @@ def main():
 
     base_url = f"{args.TARGET.rstrip('/')}:{args.PORT}"
     
-    print(f"Starting directory enumeration on {args.TARGET}:{args.PORT} using wordlist {args.WORDLIST}")
-    print(f"{'':3} {'CODE':<{STATUS_WIDTH}}DIRECTORY")
+    if not args.QUIET:
+        print(f"Starting directory enumeration on {args.TARGET}:{args.PORT} using wordlist {args.WORDLIST}")
+        print(f"{'':3} {'CODE':<{STATUS_WIDTH}}DIRECTORY")
     
     with open(args.WORDLIST, 'r') as wordlist:
         # remove empty lines and strip whitespces
@@ -208,7 +214,7 @@ def main():
 
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=args.THREADS)
     futures = [
-        executor.submit(scan_directory, base_url, directory, status_codes, STATUS_WIDTH, markers, args.DELAY) for directory in lines
+        executor.submit(scan_directory, base_url, directory, status_codes, STATUS_WIDTH, markers, args.DELAY, args.QUIET) for directory in lines
     ]
     try:
         for future in concurrent.futures.as_completed(futures):
@@ -216,7 +222,7 @@ def main():
             result = future.result()
             summary_counts[result] += 1
 
-            if counter % progress_interval == 0:
+            if counter % progress_interval == 0 and not args.QUIET:
                 with print_lock:
                     print(f"Progress: {counter}/{total}")
     except KeyboardInterrupt:
@@ -224,12 +230,13 @@ def main():
         print(f"\n{RED}[!] Directory enumeration interrupted by user.{RESET}")
         sys.exit(130)
 
-    print("Directory enumeration completed.")
-    print("Summary:")
-    print(f"{'Total requests':<20}{counter}")
-    for result_name, label in SUMMARY_LABELS.items():
-        print(f"{label:<20}{summary_counts[result_name]}")
-    print(f"Progress: {counter}/{total}")
+    if not args.QUIET:
+        print("Directory enumeration completed.")
+        print("Summary:")
+        print(f"{'Total requests':<20}{counter}")
+        for result_name, label in SUMMARY_LABELS.items():
+            print(f"{label:<20}{summary_counts[result_name]}")
+        print(f"Progress: {counter}/{total}")
 
 if __name__ == "__main__":
     main()

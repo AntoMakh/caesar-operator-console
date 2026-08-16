@@ -38,6 +38,11 @@
             "required": false,
             "default": 0,
             "flag": "--delay"
+        },
+        "QUIET": {
+            "required": false,
+            "type": "boolean",
+            "flag": "--quiet"
         }
     },
     "argument_order": [
@@ -47,7 +52,8 @@
         "EXCLUDED_STATUS_CODES",
         "EXTENSIONS",
         "THREADS",
-        "DELAY"
+        "DELAY",
+        "QUIET"
     ],
     "dependencies": []
 }
