@@ -1,0 +1,28 @@
+{
+    "workflow_name": "dns_recon",
+    "required_inputs": [
+        "DOMAIN",
+        "WORDLIST"
+    ],
+    "stages": [
+        {
+            "name": "subdomain_bruteforce",
+            "tool": "magellan",
+            "options": {
+                "DOMAIN": "{{DOMAIN}}",
+                "WORDLIST": "{{WORDLIST}}",
+                "QUIET": true
+            },
+            "output": "discovered_subdomains"
+        },
+        {
+            "name": "fingerprint_subdomains",
+            "tool": "turing",
+            "iterate_over": "discovered_subdomains",
+            "options": {
+                "TARGET": "https://{{item}}",
+                "PORT": 443
+            }
+        }
+    ]
+}

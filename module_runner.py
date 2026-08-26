@@ -75,6 +75,7 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
             f.writelines(captured_lines)
 
         print(f"[+] Execution log saved to {log_path}")
+        return [line.strip() for line in captured_lines if line.strip()]
     except KeyboardInterrupt:
         print("\n[-] Execution interrupted by user.")
         if process:

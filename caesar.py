@@ -52,7 +52,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         self.global_options = {}
         self.jobs = {}
         self.job_counter = 1
-        self.pipeline_engine = PipelineEngine()
+        self.pipeline_engine = PipelineEngine(self.tools)
 
     current_tool = None
 

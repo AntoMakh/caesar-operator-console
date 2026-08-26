@@ -21,12 +21,19 @@
             "max": 100,
             "flag": "--threads",
             "description": "Number of concurrent worker threads"
+        },
+        "QUIET": {
+            "required": false,
+            "type": "boolean",
+            "flag": "--quiet",
+            "description": "Output only discovered subdomains for pipelining"
         }
     },
     "argument_order": [
         "DOMAIN",
         "WORDLIST",
-        "THREADS"
+        "THREADS",
+        "QUIET"
     ],
     "dependencies": []
 }

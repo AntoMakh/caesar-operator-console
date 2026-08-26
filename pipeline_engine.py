@@ -2,9 +2,11 @@ import json
 import os
 import re
 from typing import Dict, Any
+from module_runner import run_module_and_log
 
 class PipelineEngine:
-    def __init__(self):
+    def __init__(self, tools: Dict[str, Any] = None):
+        self.tools = tools or {}
         self.workflows = self.load_workflows()
 
     def load_workflows(self, workflows_dir: str = "workflows") -> Dict:
@@ -29,6 +31,62 @@ class PipelineEngine:
                 print(f"[!] Warning: {workflow_name} is missing a workflow_name field")
                 continue
         return workflows
+        
+    def run_workflow(self, workflow_name, initial_context):
+        context = dict(initial_context)
+        workflow = self.workflows[workflow_name]
+        for stage in workflow["stages"]:
+            tool_name = stage["tool"]
+            print(f"[*] Running stage: {stage["name"]} ({tool_name})")
+            
+            if "iterate_over" not in stage:
+                resolved_options = {}
+                for option_name, option_value in stage["options"].items():
+                    resolved_options[option_name] = self.resolve_templates(option_value, context)
+                command = self.build_command(tool_name, resolved_options)
+                lines = run_module_and_log(tool_name, command, background=False)
+                lines = lines or []
+                if "output" in stage:
+                    context[stage["output"]] = lines
+                    print(f"[+] Saved {len(lines)} items to context['{stage['output']}']")
+            else:
+                items_to_loop = context.get(stage["iterate_over"], [])
+                print(f"[*] Looping over {len(items_to_loop)} items from '{stage['iterate_over']}'")
+                stage_results = []
+                for item in items_to_loop:
+                    context["item"] = item
+
+                    resolved_options = {}
+                    for option_name, option_value in stage["options"].items():
+                        resolved_options[option_name] = self.resolve_templates(option_value, context)
+                    
+                    command = self.build_command(tool_name, resolved_options)
+                    lines = run_module_and_log(tool_name, command, background=False)
+                    lines = lines or []
+                    stage_results.extend(lines)
+                if "output" in stage:
+                    context[stage["output"]] = stage_results
+                    print(f"[+] Saved {len(stage_results)} items to context['{stage['output']}']")
+          
+    def build_command(self, tool_name, resolved_options):
+        tool = self.tools[tool_name]
+        command = [tool["entry"]]
+        for argument in tool["argument_order"]:
+            arg = resolved_options.get(argument)
+            if arg is None:
+                continue
+            argument_dict = tool["options"][argument]
+            if argument_dict.get("type") == "boolean":
+                if str(arg).lower() in ["true", "yes", "1"]:
+                    command.append(argument_dict["flag"])
+            elif argument_dict.get("flag"):
+                command.append(argument_dict["flag"])
+                command.append(str(arg))
+            else:
+                command.append(str(arg))
+      
+        return command
+
 
     def resolve_templates(self, value: Any, context: Dict[str, Any]) -> Any:
         """

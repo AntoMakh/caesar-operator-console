@@ -24,6 +24,7 @@ def parse_arguments():
     parser.add_argument("DOMAIN", help="Target root domain (e.g. example.com)")
     parser.add_argument("WORDLIST", help="Path to subdomain wordlist")
     parser.add_argument("--threads", dest="THREADS", default="10", help="Number of worker threads")
+    parser.add_argument("--quiet", dest="QUIET", action="store_true", help="Output only discovered subdomains for pipelining")
     return parser.parse_args()
 
 def clean_domain(domain: str) -> str:
@@ -37,7 +38,7 @@ def validate_wordlist(path: str) -> None:
         print(f"{RED}[!] Error: wordlist not found at {path}{RESET}")
         sys.exit(1)
 
-def resolve_subdomain(subdomain: str, domain: str) -> Optional[Tuple[str, str]]:
+def resolve_subdomain(subdomain: str, domain: str, quiet: bool = False) -> Optional[Tuple[str, str]]:
     """perform dns resolution for a single subdomain candidate."""
     domain_name = f"{subdomain}.{domain}"
 
@@ -45,7 +46,10 @@ def resolve_subdomain(subdomain: str, domain: str) -> Optional[Tuple[str, str]]:
         ip = socket.gethostbyname(domain_name)
 
         with print_lock:
-            print(f"{GREEN}[+]{RESET} Discovered: {domain_name:<35} -> {ip}")
+            if quiet:
+                print(domain_name)
+            else:
+                print(f"{GREEN}[+]{RESET} Discovered: {domain_name:<35} -> {ip}")
 
         return (domain_name, ip)
     except socket.gaierror:
@@ -68,13 +72,14 @@ def main():
 
     total = len(subdomain_words)
     discovered = []
-    print(f"[*] Starting DNS enumeration on {target_domain} using {args.WORDLIST}")
-    print(f"[*] Total words to check: {total} | Threads running: {max_threads}\n")
-    print("-" * 60)
+    if not args.QUIET:
+        print(f"[*] Starting DNS enumeration on {target_domain} using {args.WORDLIST}")
+        print(f"[*] Total words to check: {total} | Threads running: {max_threads}\n")
+        print("-" * 60)
 
     executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_threads)
     futures = [
-        executor.submit(resolve_subdomain, word, target_domain) for word in subdomain_words
+        executor.submit(resolve_subdomain, word, target_domain, args.QUIET) for word in subdomain_words
     ]
     try:
         for future in concurrent.futures.as_completed(futures):
@@ -86,9 +91,10 @@ def main():
         executor.shutdown(wait=False, cancel_futures=True)
         print(f"\n{RED}[!] Enumeration interrupted by user.{RESET}")
         sys.exit(130)
-    print("-" * 60)
-    print(f"{GREEN}[+] DNS enumeration completed.{RESET}")
-    print(f"[*] Discovered subdomains: {len(discovered)} / {total}")
+    if not args.QUIET:
+        print("-" * 60)
+        print(f"{GREEN}[+] DNS enumeration completed.{RESET}")
+        print(f"[*] Discovered subdomains: {len(discovered)} / {total}")
 
 if __name__ == "__main__":
     main()
