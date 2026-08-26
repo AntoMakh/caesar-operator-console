@@ -41,8 +41,15 @@ class PipelineEngine:
 
         def replace_match(match):
             key = match.group(1).strip()
-            # if key is in context, return its string value
-            # if not in context, keep original placeholder (so match.group(0))
-            return str(context.get(key, match.group(0))) # match.group(0) is the default value here
+            parts = key.split(".")
+            
+            current = context
+            for part in parts:
+                if isinstance(current, dict) and part in current.keys():
+                    current = current[part]
+                else:
+                    return match.group(0)
+            return str(current)
+
         # pattern is everything in between double curly braces with group being any character that isn't a closing curly brace
         return re.sub(r"\{\{([^}]+)\}\}", replace_match, value)

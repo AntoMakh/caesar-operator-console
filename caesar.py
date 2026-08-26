@@ -691,6 +691,39 @@ Welcome to the Caesar Operator Console. Type help to list commands.
                 print(f"- {workflow}")
                 for stage in workflow_items["stages"]:
                     print(f"\t{stage["tool"]:<15}{stage["name"]}")
+            return
+
+        elif parts[0] == "run":
+            if len(parts) == 1:
+                print("[!] Usage: pipeline run <workflow_name> [KEY=VALUE ...]")
+                return
+            else:
+                workflow_name = parts[1]
+                if not workflow_name in self.pipeline_engine.workflows:
+                    print("[-] ERROR! Workflow not found!")
+                    return
+                workflow = self.pipeline_engine.workflows[workflow_name]
+            initial_context = {}
+            if len(parts) >= 3:
+                parameters = parts[2:]
+                for param in parameters:
+                    current_param = param.split("=", 1)
+                    if len(current_param) != 2:
+                        print(f"[!] MISSING VALUE AT: {current_param}")
+                        return
+                    initial_context[current_param[0]] = current_param[1]
+            for required_input in workflow.get("required_inputs", []):
+                if required_input not in initial_context:
+                    if required_input in self.global_options:
+                        initial_context[required_input] = self.global_options[required_input]
+                    else:
+                        print(f"[-] Missing required input: {required_input}")
+                        return
+            self.pipeline_engine.run_workflow(workflow_name, initial_context)
+        else:
+            print("[!] Usage: pipeline <list|run>")
+
+                    
 
 if __name__ == '__main__':
     try:
