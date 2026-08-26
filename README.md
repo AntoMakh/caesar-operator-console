@@ -19,6 +19,7 @@ Each tool is implemented as a module with a metadata file describing its interfa
 - **Interruption & Partial Log Retention**: Graceful Ctrl+C signal handling that terminates process trees cleanly and preserves partial intelligence logs.
 - **Global & Local Options**: Flexible option management with global environment variables (`setg`/`unsetg`) and schema validation.
 - **Dependency Verification**: Pre-flight system binary dependency checks (`check`) powered by `shutil.which`.
+- **Multi-Stage Workflow & Pipeline Engine**: Declarative JSON workflow chaining (`pipeline run <name>`) with dynamic output-to-input parameter passing, regex template resolver (`{{VAR}}` and dot-notation `{{item.prop}}`), and iteration loops (`iterate_over`).
 - **Tab Completion**: Context-aware autocompletion for commands, tools, options, and global settings.
 
 ## Current Modules
@@ -33,7 +34,7 @@ DNS zone transfer tester that attempts to retrieve DNS records from misconfigure
 Directory-based web content scanner that searches for keywords such as flags within discovered resources.
 
 ### SunTzu
-Directory and endpoint enumeration tool for discovering hidden paths on web servers using multi-threaded HTTP requests and wordlists. Supports optional file extensions and prints a final summary of scan results.
+Directory and endpoint enumeration tool for discovering hidden paths on web servers using multi-threaded HTTP requests and wordlists. Supports optional file extensions, quiet mode for pipelines, and prints a final summary of scan results.
 
 ### DaVinci
 Hash cracking utility that performs dictionary attacks against common hash formats.
@@ -48,15 +49,17 @@ Web technology fingerprinting tool that inspects HTTP response headers and body 
 Scans the filesystem for files with SUID/SGID bits set and optionally performs an online GTFOBins lookup for discovered binaries to identify potential privilege escalation abuse techniques.
 
 ### Magellan
-Multi-threaded DNS subdomain enumeration tool that brute-forces subdomain candidates using wordlists with responsive interrupt handling.
+Multi-threaded DNS subdomain enumeration tool that brute-forces subdomain candidates using wordlists with responsive interrupt handling and quiet mode output for pipelines.
 
 ## Architecture
 
 Caesar follows a modular architecture composed of the following components:
 
 - **Console Interface (`caesar.py`)**: REPL layer, command routing, state tracking, and background job orchestration.
+- **Pipeline Engine (`pipeline_engine.py`)**: Declarative workflow orchestrator, context broker, regex template resolver, and output aggregator.
 - **Module Loader (`module_loader.py`)**: Schema validation, module discovery, and option type checking.
 - **Module Execution Layer (`module_runner.py`)**: Subprocess execution, unbuffered streaming I/O, process tree signal management, and output logging.
+- **Workflows (`workflows/`)**: Declarative multi-stage pipeline recipes in JSON.
 - **Modules (`modules/`)**: Individual security utilities implementing CLI tools in Python, Bash, or external binaries.
 
 ## Module Format

@@ -196,6 +196,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         print("setg <opt> <val>       - Set a global option value")
         print("unsetg <opt>           - Clear a global option value")
         print("goptions               - Show global options")
+        print("pipeline [list|run]    - List or execute automated workflows")
 
     def do_exit(self, arg):
         print("[*] Exiting the Caesar Operator Console. Goodbye!")
@@ -723,7 +724,20 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         else:
             print("[!] Usage: pipeline <list|run>")
 
-                    
+    def complete_pipeline(self, text, line, begidx, endidx):
+        parts = line.split()
+        subcommands = ["list", "run"]
+
+        # case 1: completing first word so either "pipeline [space here]" or "pipeline r" for example
+        if len(parts) == 1 or (len(parts) == 2 and not line.endswith(" ")):
+            return [s for s in subcommands if s.startswith(text)]
+        
+        # case 2: completing after run, so suggest workflows
+        if len(parts) >= 2 and parts[1] == "run":
+            workflows = list(self.pipeline_engine.workflows.keys())
+            return [workflow for workflow in workflows if workflow.startswith(text)]
+        
+        return []
 
 if __name__ == '__main__':
     try:
