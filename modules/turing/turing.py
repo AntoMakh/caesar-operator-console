@@ -1,3 +1,4 @@
+from typing import Any
 import requests
 import argparse
 import sys
@@ -28,7 +29,7 @@ def parse_header_products(header_value):
         products.append({"name": name, "version": version})
     return products
 
-def load_signatures():
+def load_signatures() -> dict[str, Any]:
     signature_database_path = os.path.join(os.path.dirname(__file__), "signature.json")
     if not os.path.isfile(signature_database_path):
         print("[ERROR] No signature database file. Cannot run.")
@@ -60,73 +61,75 @@ def match_evidence(source_name, evidence, signatures):
 
     return matches if matches else None
 
-def detect_technologies(evidence, path_evidence, signatures):
-    findings = []
-
+def detect_technologies(evidence: dict[str, Any], path_evidence: dict[str, Any], signatures: dict[str, Any]) -> dict[str, Any]:
+    findings = {}
     for technology, rules in signatures.items():
-        main_match = match_evidence("main_page", evidence, rules)
-        if main_match:
-            for match in main_match:
-                findings.append({
-                        "technology": technology,
-                        "matched_source": match["matched_source"],
-                        "matched_header": match["matched_header"],
-                        "matched_value": match["matched_value"]
-                    })
+        matched_indicators = []
+        matched_headers = []
+
+        main_matches = match_evidence("main_page", evidence, rules)
+        if main_matches:
+
+            for match in main_matches:
+                matched_indicators.append(match["matched_value"])
+                if match["matched_header"]:
+                    matched_headers.append((match["matched_header"], match["matched_value"]))
 
         for path, path_info in path_evidence.items():
             if path_info is None:
                 continue
 
             if path in rules.get("paths", []) and path_info.get("status_code") == 200:
-                findings.append({
-                    "technology": technology,
-                    "matched_source": f"path: {path}",
-                    "matched_header": None,
-                    "matched_value": path
-                })
+                matched_indicators.append(path)
 
-            path_match = match_evidence(f"path: {path}", path_info, signatures)
-            if path_match:
-                findings.append({
-                    "technology": main_match["matched_value"],
-                    "matched_source": path_match["matched_source"],
-                    "matched_header": path_match["matched_header"],
-                    "matched_value": path_match["matched_value"]
-                })
+            path_matches = match_evidence(f"path: {path}", path_info, rules)
+            if path_matches:
+                for match in path_matches:
+                    matched_indicators.append(match["matched_value"])
+                    if match["matched_header"]:
+                        matched_headers.append((match["matched_header"], match["matched_value"]))
 
+        if matched_indicators:
+            unique_indicators = list(dict.fromkeys(matched_indicators))
+            findings[technology] = {
+                "matched_values": unique_indicators,
+                "matched_headers": matched_headers
+            }
     return findings
 
 def detect_technology_version(findings, evidence):
-    results = []
+    results = {}
 
-    for finding in findings:
+    for technology, data in findings.items():
         version = "unknown"
-        matched_header = finding["matched_header"]
-        matched_value = finding["matched_value"]
 
-        if matched_header:
-            header_value = evidence["headers"].get(matched_header, "")
+        for header_name, product_name in data["matched_headers"]:
+            header_value = evidence["headers"].get(header_name, "")
             parsed_products = parse_header_products(header_value)
             for product in parsed_products:
-                if product["name"].lower() == matched_value.lower():
+                if product["name"].lower() == product_name.lower():
                     version = product["version"]
                     break
+            if version != "unknown":
+                break
 
-        results.append({
-            "technology": finding["technology"],
-            "matched_header": matched_header,
-            "matched_value": matched_value,
-            "version": version
-        })
+        results[technology] = {
+            "version": version,
+            "matched_values": data["matched_values"]
+        }
     return results
 
-def collect_path_evidence(base_url, paths):
+def collect_path_evidence(base_url, paths) -> dict[str, Any]:
+    """
+    Returns dictionary containing status code, headers, and body of request to path.
+    """
     path_evidence = {}
 
     for path in paths:
+        clean_path = path.lstrip("/")
+        target_url = f"{base_url}/{clean_path}"
         try:
-            response = requests.get(f"{base_url}/{path}", timeout=3)
+            response = requests.get(target_url, timeout=3)
             path_evidence[path] = {
                 "status_code": response.status_code,
                 "headers": dict(response.headers),
@@ -141,7 +144,10 @@ def collect_path_evidence(base_url, paths):
 
     return path_evidence
 
-def collect_evidence(response):
+def collect_evidence(response: requests.Response) -> dict[str, Any]:
+    """
+    Returns dictionary containing status code, headers, and body of request.
+    """
     return {
         "status_code": response.status_code,
         "headers": dict(response.headers),
@@ -170,11 +176,12 @@ def main():
         findings = detect_technologies(evidence, path_evidence, signatures)
         findings_with_versions = detect_technology_version(findings, evidence)
         print("\n[+] Detected Technologies:")
-        for finding in findings_with_versions:
-            if finding["version"] != "unknown":
-                print(f" - {finding['technology']} {finding['version']} (matched: {finding['matched_value']})")
+        for technology, details in findings_with_versions.items():
+            matches_summary = ", ".join(details["matched_values"])
+            if details["version"] != "unknown":
+                print(f" - {technology} {details['version']} (matched: {matches_summary})")
             else:
-                print(f" - {finding['technology']} (matched: {finding['matched_value']})")
+                print(f" - {technology} (matched: {matches_summary})")   
     except requests.RequestException as e:
         print(f"Error connecting to {base_url}: {e}")
         sys.exit(1)
