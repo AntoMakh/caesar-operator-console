@@ -1,5 +1,6 @@
 {
     "workflow_name": "web_recon",
+    "fail_fast": true,
     "required_inputs": [
         "TARGET",
         "PORT",
@@ -9,6 +10,7 @@
         {
             "name": "enumerate_directories",
             "tool": "suntzu",
+            "fail_fast": true,
             "options": {
                 "TARGET": "{{TARGET}}",
                 "PORT": "{{PORT}}",

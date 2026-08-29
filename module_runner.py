@@ -62,9 +62,6 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
 
         process.wait()
 
-        if process.returncode != 0:
-            print(f"[!] Tool exited with status code: {process.returncode}")
-
         with open(log_path, "w", encoding="utf-8") as f:
             f.write("=" * 60 + "\n")
             f.write("CAESAR OPERATOR CONSOLE EXECUTION LOG\n")
@@ -73,9 +70,13 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
             f.write(f"Command   : {' '.join(command)}\n")
             f.write("=" * 60 + "\n\n")
             f.writelines(captured_lines)
-
         print(f"[+] Execution log saved to {log_path}")
-        return [line.strip() for line in captured_lines if line.strip()]
+
+        if process.returncode != 0:
+            print(f"[!] Tool exited with status code: {process.returncode}")
+            return ([], False)
+
+        return ([line.strip() for line in captured_lines if line.strip()], True)
     except KeyboardInterrupt:
         print("\n[-] Execution interrupted by user.")
         if process:
@@ -101,8 +102,10 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
             f.write("=" * 60 + "\n\n")
             f.writelines(captured_lines)
         print(f"[!] Partial execution log saved to {log_path}")
-
+        return ([], False)
     except FileNotFoundError:
         print("[!] Module entry file not found.")
+        return ([], False)
     except Exception as e:
         print(f"[!] Execution failed: {e}")
+        return ([], False)

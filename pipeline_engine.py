@@ -15,6 +15,7 @@ class StageSchema(TypedDict):
 class WorkflowSchema(TypedDict, total=False):
     workflow_name: str
     required_inputs: List[str]
+    fail_fast: NotRequired[bool]
     stages: list[StageSchema]
 
 class PipelineEngine:
@@ -51,35 +52,52 @@ class PipelineEngine:
         for stage in workflow["stages"]:
             tool_name = stage["tool"]
             print(f"[*] Running stage: {stage["name"]} ({tool_name})")
-            
+            should_fail_fast = stage.get("fail_fast", workflow.get("fail_fast", False))
             if "iterate_over" not in stage:
                 resolved_options = {}
                 for option_name, option_value in stage["options"].items():
                     resolved_options[option_name] = self.resolve_templates(option_value, context)
                 command = self.build_command(tool_name, resolved_options)
-                lines = run_module_and_log(tool_name, command, background=False)
+                module_output = run_module_and_log(tool_name, command, background=False)
+                lines = module_output[0]
                 lines = lines or []
+                if not module_output[1]:
+                    if should_fail_fast:
+                        return
+                    else:
+                        continue
                 if "output" in stage:
                     context[stage["output"]] = lines
                     print(f"[+] Saved {len(lines)} items to context['{stage['output']}']")
             else:
                 items_to_loop = context.get(stage["iterate_over"], [])
-                print(f"[*] Looping over {len(items_to_loop)} items from '{stage['iterate_over']}'")
-                stage_results = []
-                for item in items_to_loop:
-                    context["item"] = item
+                if not items_to_loop:
+                    print(f"[!] Nothing to iterate on. Skipping stage.")
+                    if "output" in stage:
+                        context[stage["output"]] = []
+                else:
+                    print(f"[*] Looping over {len(items_to_loop)} items from '{stage['iterate_over']}'")
+                    stage_results = []
+                    for item in items_to_loop:
+                        context["item"] = item
 
-                    resolved_options = {}
-                    for option_name, option_value in stage["options"].items():
-                        resolved_options[option_name] = self.resolve_templates(option_value, context)
-                    
-                    command = self.build_command(tool_name, resolved_options)
-                    lines = run_module_and_log(tool_name, command, background=False)
-                    lines = lines or []
-                    stage_results.extend(lines)
-                if "output" in stage:
-                    context[stage["output"]] = stage_results
-                    print(f"[+] Saved {len(stage_results)} items to context['{stage['output']}']")
+                        resolved_options = {}
+                        for option_name, option_value in stage["options"].items():
+                            resolved_options[option_name] = self.resolve_templates(option_value, context)
+                        
+                        command = self.build_command(tool_name, resolved_options)
+                        module_output = run_module_and_log(tool_name, command, background=False)
+                        lines = module_output[0]
+                        lines = lines or []
+                        stage_results.extend(lines)
+                        if not module_output[1]:
+                            if should_fail_fast:
+                                return
+                            else:
+                                continue
+                    if "output" in stage:
+                        context[stage["output"]] = stage_results
+                        print(f"[+] Saved {len(stage_results)} items to context['{stage['output']}']")
           
     def build_command(self, tool_name: str, resolved_options: Dict[str, Any]) -> List[str]:
         tool = self.tools[tool_name]
