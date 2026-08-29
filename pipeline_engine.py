@@ -1,15 +1,28 @@
+from typing import TypedDict, List, NotRequired
 import json
 import os
 import re
 from typing import Dict, Any
 from module_runner import run_module_and_log
 
+class StageSchema(TypedDict):
+    name: str
+    tool: str
+    options: NotRequired[Dict[str, Any]]
+    output: NotRequired[str]
+    iterate_over: NotRequired[str]
+
+class WorkflowSchema(TypedDict, total=False):
+    workflow_name: str
+    required_inputs: List[str]
+    stages: list[StageSchema]
+
 class PipelineEngine:
     def __init__(self, tools: Dict[str, Any] = None):
         self.tools = tools or {}
         self.workflows = self.load_workflows()
 
-    def load_workflows(self, workflows_dir: str = "workflows") -> Dict:
+    def load_workflows(self, workflows_dir: str = "workflows") -> Dict[str, WorkflowSchema]:
         workflows = {}
         if not os.path.exists(workflows_dir):
             os.mkdir(workflows_dir)
@@ -32,7 +45,7 @@ class PipelineEngine:
                 continue
         return workflows
         
-    def run_workflow(self, workflow_name, initial_context):
+    def run_workflow(self, workflow_name: str, initial_context: Dict[str, Any]) -> None:
         context = dict(initial_context)
         workflow = self.workflows[workflow_name]
         for stage in workflow["stages"]:
@@ -68,7 +81,7 @@ class PipelineEngine:
                     context[stage["output"]] = stage_results
                     print(f"[+] Saved {len(stage_results)} items to context['{stage['output']}']")
           
-    def build_command(self, tool_name, resolved_options):
+    def build_command(self, tool_name: str, resolved_options: Dict[str, Any]) -> List[str]:
         tool = self.tools[tool_name]
         command = [tool["entry"]]
         for argument in tool["argument_order"]:
