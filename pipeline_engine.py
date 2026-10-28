@@ -47,6 +47,28 @@ class PipelineEngine:
         return workflows
         
     def run_workflow(self, workflow_name: str, initial_context: Dict[str, Any]) -> None:
+        """
+        Run the stages of a loaded workflow in order.
+
+        Example:
+            workflow_name:   "dns_recon"
+            initial_context: {"DOMAIN": "example.com", "WORDLIST": "words.txt"}
+
+        If a stage produces:
+            ["alpha.example.com", "beta.example.com"]
+
+        and its output name is "discovered_subdomains", save:
+            context["discovered_subdomains"] = [
+                "alpha.example.com",
+                "beta.example.com",
+            ]
+
+        A later stage can iterate over that list using:
+            "iterate_over": "discovered_subdomains"
+
+        Returns None. Results are kept in the local context during the run.
+        Running this method executes tools and writes execution logs.
+        """
         context = dict(initial_context)
         workflow = self.workflows[workflow_name]
         for stage in workflow["stages"]:
@@ -58,9 +80,12 @@ class PipelineEngine:
                 for option_name, option_value in stage["options"].items():
                     resolved_options[option_name] = self.resolve_templates(option_value, context)
                 command = self.build_command(tool_name, resolved_options)
+                # Example result: (["alpha.example.com", "beta.example.com"], True)
                 module_output = run_module_and_log(tool_name, command, background=False)
+                # [0] contains the output lines; use an empty list if there are none.
                 lines = module_output[0]
                 lines = lines or []
+                # [1] is the success flag: False means execution failed.
                 if not module_output[1]:
                     if should_fail_fast:
                         return
@@ -100,6 +125,21 @@ class PipelineEngine:
                         print(f"[+] Saved {len(stage_results)} items to context['{stage['output']}']")
           
     def build_command(self, tool_name: str, resolved_options: Dict[str, Any]) -> List[str]:
+        """
+        Turn resolved options into an ordered list of command arguments.
+
+        Example, using a tool whose entry is example.py:
+            tool_name: "example"
+            resolved_options:
+                {"TARGET": "example.com", "THREADS": 4, "QUIET": True}
+
+            returns:
+                ["example.py", "example.com", "--threads", "4", "--quiet"]
+
+        This example assumes THREADS uses --threads and QUIET uses --quiet.
+        Argument order comes from the tool's metadata.
+        This method builds the list; it does not run the tool.
+        """
         tool = self.tools[tool_name]
         command = [tool["entry"]]
         for argument in tool["argument_order"]:
@@ -121,9 +161,15 @@ class PipelineEngine:
 
     def resolve_templates(self, value: Any, context: Dict[str, Any]) -> Any:
         """
-        Replaces {{VARAIBLE}} placeholders in a string with matching values from context dictionary.
-        If value is not a string (for example: int, bool, list), returns it as-is.
-        If a placeholder is not found in context, leaves it unchaned.
+        Replace placeholders in a value using the context dictionary.
+
+        Example:
+            value:   "https://{{item.domain}}:{{PORT}}"
+            context: {"item": {"domain": "example.com"}, "PORT": 443}
+            returns: "https://example.com:443"
+
+        A non-string value, such as 443 or True, is returned unchanged.
+        A missing variable stays as its original placeholder.
         """
         if not isinstance(value, str):
             return value
