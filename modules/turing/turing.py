@@ -5,6 +5,7 @@ import sys
 import json
 import os
 import re
+from urllib.parse import urlsplit, urlunsplit
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Turing Web App Fingerprinting tool")
@@ -14,13 +15,29 @@ def parse_arguments():
 
 def validate_target(target):
     if not target.startswith("http://") and not target.startswith("https://"):
-        print("Error: TARGET must start with http:// or https://")
-        sys.exit(1)
+        raise ValueError("TARGET must start with http:// or https://")
 
 def validate_port(port):
     if not port.isdigit() or not (1 <= int(port) <= 65535):
-        print("Error: invalid port number")
-        sys.exit(1)
+        raise ValueError("Invalid port number")
+
+def build_target_url(target: str, port: str) -> str:
+    """Insert the validated port while preserving the URL's other parts."""
+    parts = urlsplit(target)
+    hostname = parts.hostname
+
+    if hostname is None:
+        raise ValueError("Error: TARGET must contain a hostname")
+
+    # to handle ipv6 addresses such as [::1]
+    if ":" in hostname:
+        hostname = f"[{hostname}]"
+
+    credentials, separator, _ = parts.netloc.rpartition("@")
+    authority = f"{credentials}{separator}{hostname}:{port}"
+
+    return urlunsplit((parts.scheme, authority, parts.path, parts.query, parts.fragment))
+
 
 def parse_header_products(header_value):
     products = []
@@ -156,10 +173,15 @@ def collect_evidence(response: requests.Response) -> dict[str, Any]:
 
 def main():
     args = parse_arguments()
-    validate_target(args.TARGET)
-    validate_port(args.PORT)
+
+    try:
+        validate_target(args.TARGET)
+        validate_port(args.PORT)
+        base_url = build_target_url(args.TARGET, args.PORT)
+    except ValueError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        sys.exit(1)
     
-    base_url = f"{args.TARGET}:{args.PORT}"
     try:
         response = requests.get(base_url, timeout=3)
         evidence = collect_evidence(response)
