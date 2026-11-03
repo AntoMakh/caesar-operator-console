@@ -4,6 +4,7 @@ import os
 import re
 from typing import Dict, Any
 from module_runner import run_module_and_log
+from command_builder import build_module_command
 
 class StageSchema(TypedDict):
     name: str
@@ -124,39 +125,14 @@ class PipelineEngine:
                         context[stage["output"]] = stage_results
                         print(f"[+] Saved {len(stage_results)} items to context['{stage['output']}']")
           
-    def build_command(self, tool_name: str, resolved_options: Dict[str, Any]) -> List[str]:
-        """
-        Turn resolved options into an ordered list of command arguments.
-
-        Example, using a tool whose entry is example.py:
-            tool_name: "example"
-            resolved_options:
-                {"TARGET": "example.com", "THREADS": 4, "QUIET": True}
-
-            returns:
-                ["example.py", "example.com", "--threads", "4", "--quiet"]
-
-        This example assumes THREADS uses --threads and QUIET uses --quiet.
-        Argument order comes from the tool's metadata.
-        This method builds the list; it does not run the tool.
-        """
+    def build_command(
+        self,
+        tool_name: str,
+        resolved_options: Dict[str, Any],
+    ) -> List[str]:
+        """Build a stage command using resolved options and module defaults."""
         tool = self.tools[tool_name]
-        command = [tool["entry"]]
-        for argument in tool["argument_order"]:
-            arg = resolved_options.get(argument)
-            if arg is None:
-                continue
-            argument_dict = tool["options"][argument]
-            if argument_dict.get("type") == "boolean":
-                if str(arg).lower() in ["true", "yes", "1"]:
-                    command.append(argument_dict["flag"])
-            elif argument_dict.get("flag"):
-                command.append(argument_dict["flag"])
-                command.append(str(arg))
-            else:
-                command.append(str(arg))
-      
-        return command
+        return build_module_command(tool, resolved_options)
 
 
     def resolve_templates(self, value: Any, context: Dict[str, Any]) -> Any:

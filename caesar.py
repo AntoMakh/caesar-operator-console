@@ -9,6 +9,7 @@ from module_runner import run_module_and_log
 import shutil
 import threading
 from pipeline_engine import PipelineEngine
+from command_builder import build_module_command
 
 
 try:
@@ -373,25 +374,13 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             print(f"{opt:<30}{val:<20}")
 
     def build_command_string(self, tool: ToolSchema) -> List[str]:
-        command = []
-        command.append(tool["entry"])
-        for option_name in tool["argument_order"]:
-            option_info = tool["options"][option_name]
-            if option_info["value"] is None: # if not required and set to none
-                continue
-            flag = option_info.get("flag")
-            type = option_info.get("type", "string")
+        """Build a command using the console's current option values."""
+        option_values = {}
 
-            if flag and type == "boolean": # if boolean flag and set to true, add flag to command, if false skip
-                val = option_info["value"]
-                if val.lower() in ["true", "yes", "1"]:
-                    command.append(flag)
-                continue
+        for option_name, option_info in tool["options"].items():
+            option_values[option_name] = option_info["value"]
 
-            if flag: # either required or not required and set, check if has flag (should be for optional options)
-                command.append(flag)
-            command.append(str(option_info["value"]))
-        return command
+        return build_module_command(tool, option_values)
 
     def do_info(self, arg):
         if arg.strip() == "":

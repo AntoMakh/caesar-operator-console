@@ -107,6 +107,35 @@ class TestBuildCommand(unittest.TestCase):
             ["example.py", "example.com"]
         )
 
+    def test_uses_default_when_workflow_omits_option(self):
+        thread_option = self.engine.tools["example"]["options"]["THREADS"]
+        thread_option["default"] = 10
+        thread_option["value"] = 99
+
+        command = self.engine.build_command(
+            "example",
+            {"TARGET": "example.com"},
+        )
+
+        self.assertEqual(
+            command,
+            ["example.py", "example.com", "--threads", "10"],
+        )
+
+    def test_workflow_value_overrides_default(self):
+        thread_option = self.engine.tools["example"]["options"]["THREADS"]
+        thread_option["default"] = 10
+
+        command = self.engine.build_command(
+            "example",
+            {"TARGET": "example.com", "THREADS": 4},
+        )
+
+        self.assertEqual(
+            command,
+            ["example.py", "example.com", "--threads", "4"],
+        )
+
 class TestRunWorkflow(unittest.TestCase):
     def setUp(self):
         tools = {
