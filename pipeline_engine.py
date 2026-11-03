@@ -80,7 +80,13 @@ class PipelineEngine:
                 resolved_options = {}
                 for option_name, option_value in stage["options"].items():
                     resolved_options[option_name] = self.resolve_templates(option_value, context)
-                command = self.build_command(tool_name, resolved_options)
+                try:
+                    command = self.build_command(tool_name, resolved_options)
+                except ValueError as error:
+                    print(f"[!] Stage '{stage['name']}': {error}")
+                    if should_fail_fast:
+                        return
+                    continue
                 # Example result: (["alpha.example.com", "beta.example.com"], True)
                 module_output = run_module_and_log(tool_name, command, background=False)
                 # [0] contains the output lines; use an empty list if there are none.
@@ -111,7 +117,13 @@ class PipelineEngine:
                         for option_name, option_value in stage["options"].items():
                             resolved_options[option_name] = self.resolve_templates(option_value, context)
                         
-                        command = self.build_command(tool_name, resolved_options)
+                        try:
+                            command = self.build_command(tool_name, resolved_options)
+                        except ValueError as error:
+                            print(f"[!] Stage '{stage['name']}': {error}")
+                            if should_fail_fast:
+                                return
+                            continue
                         module_output = run_module_and_log(tool_name, command, background=False)
                         lines = module_output[0]
                         lines = lines or []

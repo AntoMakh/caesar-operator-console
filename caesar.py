@@ -10,7 +10,7 @@ import shutil
 import threading
 from pipeline_engine import PipelineEngine
 from command_builder import build_module_command
-
+from option_validation import validate_option
 
 try:
     import readline
@@ -142,35 +142,14 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         with open(self.settings_file, "w") as f:
             json.dump(data, f, indent=4)
 
-    def validate_option_value(self, option_name: str, option_info: OptionSchema, option_value: str) -> Tuple[bool, Optional[str]]:
-        option_type = option_info.get("type", "string")
+    def validate_option_value(self, option_name: str, option_info: OptionSchema, option_value: Any) -> Tuple[bool, Optional[str]]:
+        try:
+            validate_option(option_name, option_info, option_value)
+        except ValueError as error:
+            return False, str(error)
 
-        if option_type == "string":
-            return True, None
-        elif option_type == "integer":
-            if option_value.isdigit():
-                int_value = int(option_value)
-                min_val = option_info.get("min")
-                max_val = option_info.get("max")
-                if (min_val is not None and int_value < min_val) or (max_val is not None and int_value > max_val):
-                    return False, f"Value must be in the range {min_val} to {max_val}."
-                return True, None
-            return False, "Value must be an integer."
-        elif option_type == "file":
-            if option_info["must_exist"] and not os.path.isfile(option_value):
-                return False, "File does not exist."
-            return True, None
-        elif option_type == "choice":
-            choices = option_info.get("choices", [])
-            if option_value not in choices:
-                return False, f"Value must be one of: {', '.join(choices)}."
-            return True, None
-        elif option_type == "boolean":
-            if option_value.lower() in ["true", "yes", "1", "false", "no", "0"]:
-                return True, None
-            return False, "Value must be a boolean (true/false, yes/no, 1/0)."
-        else:
-            return False, f"Unknown option type: {option_type}."
+        return True, None
+            
 
     def do_help(self, arg):
         print("Available commands:")
@@ -449,7 +428,11 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             return False
         print("[*] Running " + self.current_tool)
         self.print_tool_options(tool)
-        command = self.build_command_string(tool)
+        try:
+            command = self.build_command_string(tool)
+        except ValueError as error:
+            print(f"[!] Cannot run tool: {error}")
+            return
         print(f"[*] Executing:\n{' '.join(command)}")
         print("-" * 50)
         if self.do_check(None) is False:

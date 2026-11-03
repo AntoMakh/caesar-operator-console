@@ -136,6 +136,23 @@ class TestBuildCommand(unittest.TestCase):
             ["example.py", "example.com", "--threads", "4"],
         )
 
+    def test_rejects_integer_below_minimum(self):
+        thread_option = self.engine.tools["example"]["options"]["THREADS"]
+        thread_option["min"] = 1
+
+        with self.assertRaisesRegex(ValueError, "THREADS: must be at least 1"):
+            self.engine.build_command(
+                "example",
+                {"TARGET": "example.com", "THREADS": 0},
+            )
+
+    def test_rejects_missing_required_option(self):
+        target_option = self.engine.tools["example"]["options"]["TARGET"]
+        target_option["required"] = True
+
+        with self.assertRaisesRegex(ValueError, "TARGET: a value is required"):
+            self.engine.build_command("example", {})
+
 class TestRunWorkflow(unittest.TestCase):
     def setUp(self):
         tools = {

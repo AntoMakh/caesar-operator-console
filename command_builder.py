@@ -1,7 +1,7 @@
 from typing import Any
 
 from module_loader import ToolSchema
-
+from option_validation import validate_option
 
 def build_module_command(
     tool: ToolSchema,
@@ -14,6 +14,8 @@ def build_module_command(
         option_info = tool["options"][option_name]
         value = option_values.get(option_name, option_info.get("default"))
 
+        validate_option(option_name, option_info, value)
+                
         if value is None:
             continue
 
