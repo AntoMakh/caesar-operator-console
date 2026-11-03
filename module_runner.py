@@ -4,6 +4,14 @@ import sys
 import subprocess
 from datetime import datetime
 from pathlib import Path
+import threading
+
+def capture_stderr(stream, diagnostic_lines):
+    """Display stderr and collect it for the execution log."""
+    with stream:
+        for line in stream:
+            print(line, end="", file=sys.stderr, flush=True)
+            diagnostic_lines.append(line)
 
 def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs", background: bool = False) -> Union[Tuple[subprocess.Popen, str], None]:
     """execute tool process, stream live output, and save structured execution log."""
@@ -45,22 +53,34 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
         return process, log_path
 
     captured_lines = []
+    diagnostic_lines = []
+    process = None
+    stderr_thread = None
 
     try:
         process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             text=True,
             bufsize=1
         )
 
+        stderr_thread = threading.Thread(
+            target=capture_stderr,
+            args=(process.stderr, diagnostic_lines),
+            daemon=True
+        )
+        stderr_thread.start()
+
         if process.stdout:
-            for line in process.stdout:
-                print(line, end="")
-                captured_lines.append(line)
+            with process.stdout:
+                for line in process.stdout:
+                    print(line, end="")
+                    captured_lines.append(line)
 
         process.wait()
+        stderr_thread.join()
 
         with open(log_path, "w", encoding="utf-8") as f:
             f.write("=" * 60 + "\n")
@@ -70,6 +90,9 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
             f.write(f"Command   : {' '.join(command)}\n")
             f.write("=" * 60 + "\n\n")
             f.writelines(captured_lines)
+            if diagnostic_lines:
+                f.write("\n--- stderr diagnostics ---\n")
+                f.writelines(diagnostic_lines)
         print(f"[+] Execution log saved to {log_path}")
 
         if process.returncode != 0:
@@ -93,6 +116,8 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
                 process.wait(timeout=1)
             except Exception:
                 pass
+            if stderr_thread is not None:
+                stderr_thread.join(timeout=1)
         with open(log_path, "w", encoding="utf-8") as f:
             f.write("=" * 60 + "\n")
             f.write("CAESAR OPERATOR CONSOLE EXECUTION LOG\n")
@@ -101,6 +126,9 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
             f.write(f"Command   : {' '.join(command)}\n")
             f.write("=" * 60 + "\n\n")
             f.writelines(captured_lines)
+            if diagnostic_lines:
+                f.write("\n--- stderr diagnostics ---\n")
+                f.writelines(diagnostic_lines)
         print(f"[!] Partial execution log saved to {log_path}")
         return ([], False)
     except FileNotFoundError:
