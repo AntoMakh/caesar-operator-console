@@ -150,12 +150,12 @@ def scan_directory(base_url, directory, status_codes, STATUS_WIDTH, markers, del
 
     except requests.exceptions.Timeout:
         with print_lock:
-            print(f"{MARK_OTHER} {'TIMEOUT':<{STATUS_WIDTH}}{directory}")
+            print(f"{MARK_OTHER} {'TIMEOUT':<{STATUS_WIDTH}}{directory}", file=sys.stderr)
         return "timeout"
 
     except requests.exceptions.RequestException:
         with print_lock:
-            print(f"{MARK_OTHER} {'ERROR':<{STATUS_WIDTH}}{directory}")
+            print(f"{MARK_OTHER} {'ERROR':<{STATUS_WIDTH}}{directory}", file=sys.stderr)
         return "error"
 
 
