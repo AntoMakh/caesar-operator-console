@@ -75,6 +75,9 @@ class PipelineEngine:
         workflow = self.workflows[workflow_name]
         for stage in workflow["stages"]:
             tool_name = stage["tool"]
+            if tool_name not in self.tools:
+                print(f"[!] ERROR: Workflow {workflow_name}, stage {stage['name']}: unknown tool {tool_name}.\nStopping workflow.")
+                break
             print(f"[*] Running stage: {stage["name"]} ({tool_name})")
             should_fail_fast = stage.get("fail_fast", workflow.get("fail_fast", False))
             tool = self.tools[tool_name]
