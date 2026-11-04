@@ -5,6 +5,7 @@ import re
 from typing import Dict, Any
 from module_runner import run_module_and_log
 from command_builder import build_module_command
+from module_dependencies import get_missing_dependencies
 
 class StageSchema(TypedDict):
     name: str
@@ -76,6 +77,17 @@ class PipelineEngine:
             tool_name = stage["tool"]
             print(f"[*] Running stage: {stage["name"]} ({tool_name})")
             should_fail_fast = stage.get("fail_fast", workflow.get("fail_fast", False))
+            tool = self.tools[tool_name]
+            missing = get_missing_dependencies(tool)
+
+            if missing:
+                print(
+                    f"[!] Stage '{stage['name']}': "
+                    f"missing dependencies: {', '.join(missing)}"
+                )
+                if should_fail_fast:
+                    return
+                continue
             if "iterate_over" not in stage:
                 resolved_options = {}
                 for option_name, option_value in stage["options"].items():

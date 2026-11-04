@@ -11,6 +11,7 @@ import threading
 from pipeline_engine import PipelineEngine
 from command_builder import build_module_command
 from option_validation import validate_option
+from module_dependencies import get_missing_dependencies
 
 try:
     import readline
@@ -268,23 +269,22 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         self.apply_global_options()        
 
     def do_check(self, arg):
-        """check if required system dependencies exist for selected tool."""
+        """Check declared executable dependencies for the selected tool."""
         if not self.check_if_tool_selected():
             return False
+
         tool = self.get_current_tool()
-        dependencies = tool.get("dependencies", [])
+        missing = get_missing_dependencies(tool)
 
-        all_met = True
-        for dependency in dependencies:
-            binary_path = shutil.which(dependency)
-            if not binary_path:
-                print("[-] Missing dependency: "+dependency+". Please install it to run module.")
-                all_met = False
-
-        if all_met:
-            print(f"[+] All module dependencies met for {self.current_tool}.")
-        else:
+        if missing:
+            for dependency in missing:
+                print(
+                    f"[-] Missing dependency: {dependency}. "
+                    "Please install it to run module."
+                )
             return False
+
+        print(f"[+] All module dependencies met for {self.current_tool}.")
 
     def complete_set(self, text, line, begidx, endidx):
         return self.complete_option_names(text)

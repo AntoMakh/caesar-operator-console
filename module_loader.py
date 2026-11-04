@@ -54,7 +54,8 @@ def normalize_module(metadata: dict, module_path: str) -> ToolSchema:
         "description": metadata.get("description", ""),
         "entry": entry_path,
         "options": options,
-        "argument_order": argument_order
+        "argument_order": argument_order,
+        "dependencies": metadata.get("dependencies", []),
     }
     
 

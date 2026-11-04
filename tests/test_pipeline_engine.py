@@ -353,3 +353,18 @@ class TestRunWorkflow(unittest.TestCase):
                         }
                     )
                 self.assertEqual(mock_run.call_count, expected_calls)
+
+    def test_missing_dependency_stops_fail_fast_workflow(self):
+        self.engine.workflows["demo"]["fail_fast"] = True
+
+        with patch(
+            "pipeline_engine.get_missing_dependencies",
+            return_value=["example_binary"],
+        ):
+            with patch("pipeline_engine.run_module_and_log") as mock_run:
+                self.engine.run_workflow(
+                    "demo",
+                    {"DOMAIN": "example.com"},
+                )
+
+        mock_run.assert_not_called()
