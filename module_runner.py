@@ -5,6 +5,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 import threading
+import tempfile
 
 def capture_stderr(stream, diagnostic_lines):
     """Display stderr and collect it for the execution log."""
@@ -18,8 +19,12 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
     os.makedirs(output_dir, exist_ok=True)
     timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     formatted_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    log_filename = f"{tool_name}_{timestamp_str}.log"
-    log_path = os.path.join(output_dir, log_filename)
+    log_descriptor, log_path = tempfile.mkstemp(
+        prefix=f"{tool_name}_{timestamp_str}_",
+        suffix=".log",
+        dir=output_dir,
+    )
+    os.close(log_descriptor)
 
     entry_path = Path(command[0]).as_posix()
     command[0] = entry_path
