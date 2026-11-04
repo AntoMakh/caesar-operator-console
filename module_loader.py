@@ -58,8 +58,28 @@ def normalize_module(metadata: dict, module_path: str) -> ToolSchema:
         "dependencies": metadata.get("dependencies", []),
     }
     
+def validate_module_fields(metadata: dict) -> None:
+    """Check the field types needed to load a module."""
+    entry = metadata.get("entry")
+    if not isinstance(entry, str) or not entry.strip():
+        raise ValueError("'entry' must be a non-empty string")
 
+    options = metadata.get("options", {})
+    if not isinstance(options, dict):
+        raise ValueError("'options' must be an object")
 
+    for option_name, option_info in options.items():
+        if not isinstance(option_info, dict):
+            raise ValueError(f"option '{option_name}' must be an object")
+
+    for field in ("argument_order", "dependencies"):
+        values = metadata.get(field, [])
+        if not isinstance(values, list):
+            raise ValueError(f"'{field}' must be a list of strings")
+
+        for value in values:
+            if not isinstance(value, str):
+                raise ValueError(f"'{field}' must contain only strings")
 
 def load_modules(modules_dir: str = "modules") -> Dict[str, ToolSchema]:
     """load and validate all tool metadata schemas from the modules directory."""
@@ -73,14 +93,21 @@ def load_modules(modules_dir: str = "modules") -> Dict[str, ToolSchema]:
         metadata_path = os.path.join(module_path, "module.json") # get path to module.json
         if not os.path.isfile(metadata_path): # if module.json doesn't exist, skip
             continue
-        with open(metadata_path, "r") as f: # load metadata
-            metadata = json.load(f)
+        try:
+            with open(metadata_path, "r", encoding="utf-8-sig") as metadata_file:
+                metadata = json.load(metadata_file)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            print(f"[WARNING] Cannot read metadata '{metadata_path}': {error}. Skipping.")
+            continue
+
+        if not isinstance(metadata, dict):
+            print(f"[WARNING] Metadata '{metadata_path}' must be a JSON object. Skipping.")
+            continue
         
-        required_fields = ["entry"]
-        missing = [field for field in required_fields if field not in metadata]
-        
-        if missing:
-            print(f"[WARNING] Module '{module_name}' is missing required fields: {missing}. Skipping.")
+        try:
+            validate_module_fields(metadata)
+        except ValueError as error:
+            print(f"[WARNING] Invalid metadata '{metadata_path}': {error}. Skipping.")
             continue
 
         entry_path = os.path.join(module_path, metadata["entry"])

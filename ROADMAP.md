@@ -30,7 +30,7 @@ The Windows checks cover the core console and local HTTP workflow. Bash module c
 - [ ] **N3 — Finish coverage for shared command preparation.** The console and pipeline share command construction and value validation (`73e9d83`, `9da57aa`). Tests cover workflow defaults, explicit overrides, and invalid values. Add a regression case using SunTzu's actual `404` exclusion metadata.
   **Done when:** small shared helpers apply consistent defaults, validation, and argument construction for both execution paths; native/string booleans work; invalid loaded/global/workflow values are rejected before launch. Explicit workflow values override defaults without changing the selected tool's state. Cover the SunTzu default exclusion of `404` in a regression test.
 
-- [ ] **N4 — Validate module/workflow structure before use.** Start by reporting and skipping malformed `module.json` files at startup. Workflows also need structural validation. Missing templates survive unchanged and absent iteration keys look like empty results.
+- [ ] **N4 — Validate module/workflow structure before use.** The loader now reports and skips unreadable or invalid `module.json` files and metadata whose root is not an object. Next, check field types such as `entry` and `options`, then validate workflow structure and references. Missing templates survive unchanged and absent iteration keys look like empty results.
   **Done when:** malformed files, wrong field types, unknown tools/options, and invalid output references produce file/stage-specific diagnostics without crashing the console. Resolve and validate data-dependent values before each stage; distinguish a missing input from a valid empty list. Keep `TypedDict` declarations consistent with the runtime contract, including stage `fail_fast`; type hints do not replace runtime validation.
 
 - [ ] **N5 — Finish verification of the web workflow's data handoff.** Foreground stderr is separated from results (`f4ba460`), SunTzu sends request errors to stderr (`566b1ef`), and Turing puts the port before the path (`0852da7`). The local fixture run passed. The mocked two-stage regression and review of the remaining quiet-mode diagnostic paths are still open.
@@ -52,6 +52,9 @@ The Windows checks cover the core console and local HTTP workflow. Bash module c
 
 - [ ] **X4 — Review module behavior one tool at a time.** Establish output/exit contracts before adding quiet flags. Start with concrete findings: Napoleon treats any response lacking “refused” as success; DaVinci disables potfile writes then reads results using `--show`.
   **Done when, per tool:** fixtures establish correct success, empty-result, and error behavior; exit codes and metadata agree with the CLI; quiet output is documented and tested if a workflow needs it. Include Bismarck/Judas/Napoleon output parity and Turing header/path evidence handling in this review. Do not rewrite Bash modules merely to standardize the language.
+
+- [ ] **X5 — Unify error handling and messages.** Start with common failures in module loading, option validation, workflow execution, and subprocess launch. Give each message the relevant file, tool, stage, or option name. Describe what failed and give a corrective action when one is known. Helpers should report failures to their callers, which decide whether to warn and skip, stop the run, or return to the prompt. Keep execution diagnostics out of workflow result data.
+  **Done when:** common failures have a consistent format, produce one clear diagnostic at the appropriate boundary, and preserve the documented exit or skip behavior. Verify representative failures through console and workflow entry points.
 
 ## Later
 
