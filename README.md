@@ -12,11 +12,11 @@ Each tool is implemented as a module with a metadata file describing its interfa
 
 ## Features
 
-- **Interactive Operator Console**: Clean, responsive REPL powered by Python's `cmd` framework with full readline support.
+- **Interactive Operator Console**: Python `cmd` console with Tab completion when readline support is available.
 - **Automatic Module Discovery**: Schema-driven discovery from `modules/*/module.json`.
 - **Background Job Management**: Asynchronous tool execution (`run -b`) with live process tracking, auto-kill countdown timers (`timeout`), and duration monitoring.
 - **Real-Time Streaming & Logging**: Unbuffered real-time stdout streaming and automatic structured log persistence under `outputs/`.
-- **Interruption & Partial Log Retention**: Graceful Ctrl+C signal handling that terminates process trees cleanly and preserves partial intelligence logs.
+- **Interruption & Partial Log Retention**: Ctrl+C interrupts foreground runs and saves captured output.
 - **Global & Local Options**: Flexible option management with global environment variables (`setg`/`unsetg`) and schema validation.
 - **Dependency Verification**: Pre-flight system binary dependency checks (`check`) powered by `shutil.which`.
 - **Multi-Stage Workflow & Pipeline Engine**: Declarative JSON workflow chaining (`pipeline run <name>`) with dynamic output-to-input parameter passing, regex template resolver (`{{VAR}}` and dot-notation `{{item.prop}}`), and iteration loops (`iterate_over`).
@@ -38,6 +38,53 @@ python -m venv .venv
 Bash modules require `bash`. Individual modules may also require
 executables such as `hashcat`. In Caesar, select a module and run
 `check` to see whether its declared executables are available.
+
+For Tab completion on Windows, install `pyreadline3` in the same environment
+and restart Caesar.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install pyreadline3
+```
+
+### Try the local web workflow
+
+From the repository root, start a loopback-only HTTP server in one terminal.
+
+```powershell
+.\.venv\Scripts\python.exe -m http.server 8000 --bind 127.0.0.1 --directory tests/fixtures/web_demo/site
+```
+
+Leave it running. In a second terminal at the repository root, launch Caesar
+with `.\.venv\Scripts\python.exe caesar.py`. Enter these commands at the Caesar prompt.
+
+```text
+pipeline list
+pipeline run web_recon TARGET=http://127.0.0.1 PORT=8000 WORDLIST=tests/fixtures/web_demo/words.txt
+```
+
+SunTzu discovers `admin.html` and `about.html` in either order. The wordlist
+also includes `missing.html`, which returns 404 and is excluded. The workflow
+passes the two discoveries to Turing, which requests each page. Only
+`admin.html` contains the synthetic `wp-content` marker, so it produces a
+WordPress signature match. Look in `outputs/` for one SunTzu log and two
+separate Turing logs. Press Ctrl+C in the server terminal when finished.
+
+The `TARGET` scheme determines whether to use HTTP or HTTPS. `PORT` selects
+the listening port. Here the server uses HTTP on port 8000, so Turing requests
+URLs such as `http://127.0.0.1:8000/admin.html`. Supply the host and scheme in
+`TARGET` and the port separately when running `web_recon`.
+
+### How workflow stages pass data
+
+Workflow definitions live in `workflows/`. In `web_recon.json`, the first
+stage saves successful stdout lines as `saved_directories` using `output`.
+The second stage uses `iterate_over: "saved_directories"` and substitutes each
+line into `{{item}}`. An empty list skips the iteration. The runner displays
+and logs stderr separately from the lines passed to downstream stages.
+
+Stages use module defaults for omitted options and validate values before
+launch. A workflow can set `fail_fast: true` to stop on a stage failure. It
+defaults to `false`, and a stage can override the workflow setting.
 
 ## Current Modules
 
@@ -74,8 +121,9 @@ Caesar follows a modular architecture composed of the following components:
 
 - **Console Interface (`caesar.py`)**: REPL layer, command routing, state tracking, and background job orchestration.
 - **Pipeline Engine (`pipeline_engine.py`)**: Declarative workflow orchestrator, context broker, regex template resolver, and output aggregator.
-- **Module Loader (`module_loader.py`)**: Schema validation, module discovery, and option type checking.
-- **Module Execution Layer (`module_runner.py`)**: Subprocess execution, unbuffered streaming I/O, process tree signal management, and output logging.
+- **Module Loader (`module_loader.py`)**: Discovers modules and normalizes their metadata.
+- **Shared preparation (`command_builder.py`, `option_validation.py`, `module_dependencies.py`)**: Builds arguments, validates option values, and checks declared executables for console runs and workflows.
+- **Module Execution Layer (`module_runner.py`)**: Starts subprocesses, streams foreground output, and writes execution logs.
 - **Workflows (`workflows/`)**: Declarative multi-stage pipeline recipes in JSON.
 - **Modules (`modules/`)**: Individual security utilities implementing CLI tools in Python, Bash, or external binaries.
 
@@ -90,7 +138,7 @@ Example:
   "name": "example",
   "description": "Example module",
   "entry": "wrapper.sh",
-  "argument_order": ["TARGET", "PORT"],
+  "argument_order": ["TARGET", "PORT", "STATUS_CODES", "WORDLIST"],
   "dependencies": ["nc"],
   "options": {
     "TARGET": {
@@ -123,14 +171,14 @@ Example:
 
 - **`entry`**: The script or wrapper file to execute (e.g. `suntzu.py`, `wrapper.sh`).
 - **`dependencies`**: Optional list of external system binaries (e.g. `nc`, `host`, `curl`) required to run the module. Checked pre-execution via `check`.
-- **`argument_order`**: Optional list defining the exact positional argument order passed to the tool entrypoint.
+- **`argument_order`**: Optional list defining the order in which options become command arguments. If supplied, it must include every declared option.
 - **`options`**: Dictionary defining configurable parameters. Each option supports:
   - `required` *(bool)*: Whether the option must have a value before `run` or `save` can proceed.
   - `default` *(any)*: Initial value loaded when the module is selected or reset.
     > [!IMPORTANT]
     > If an option should start unset, **omit the `default` field** or set it to `null`. Avoid using empty strings (`""`) or whitespace strings as defaults; Caesar treats them as unset and prints a warning during module load.
-  - `flag` *(string)*: If specified, passes the option as a named flag (e.g. `--status-codes 200,301`) instead of a positional value.
-  - `type` *(string)*: Type enforcement during `set`. Supported types:
+  - `flag` *(string)*: If specified, passes the option as a named flag (e.g. `--status-codes 200`) instead of a positional value.
+  - `type` *(string)*: Checked during `set` and when preparing a console or workflow run. Supported types:
     - `string`: Any text value.
     - `integer`: Validates whole numbers. Supports optional `min` and `max` bounds.
     - `file`: Validates file paths. If `must_exist: true`, checks that the target file exists on disk.
@@ -170,6 +218,8 @@ goptions              - Show all active global options
 check                 - Check if required system dependencies are installed
 run                   - Execute tool in foreground (streaming output)
 run -b                - Execute tool asynchronously in the background
+pipeline list         - List workflows and their stages
+pipeline run <name> [KEY=VALUE ...] - Run a workflow in the foreground
 jobs                  - List active and completed background jobs with elapsed duration
 output <job_id>       - View output log of a background job
 timeout <id> <sec>    - Set an auto-kill countdown timer on a background job
@@ -215,8 +265,15 @@ JOB_ID    TOOL              STATUS        DURATION    LOG FILE
 caesar/
 │
 ├── caesar.py               # Main operator console REPL
-├── module_loader.py        # Schema parser and validator
+├── module_loader.py        # Module discovery and metadata normalization
+├── command_builder.py     # Shared command construction
+├── option_validation.py   # Shared option checks
+├── module_dependencies.py # Shared executable lookup
+├── pipeline_engine.py     # Workflow execution
 ├── module_runner.py        # Process executor and log manager
+├── requirements.txt        # Python dependencies
+├── workflows/             # JSON workflow definitions
+├── tests/                 # Unit tests and local demo fixtures
 ├── outputs/                # Structured execution logs
 │
 └── modules/
@@ -238,13 +295,7 @@ caesar/
 - **Lightweight Architecture**: Rely on standard library capabilities (`cmd`, `subprocess`, `threading`, `shutil`) rather than heavy external frameworks.
 - **Operator Safety & Usability**: Enforce defensive bounds validation, clear feedback, interruption handlers, and automatic log retention.
 
-## Future Tools in Development
-
-### Hannibal
-Network host discovery tool designed to identify live hosts on a network through scanning techniques.
-
-### Tesla
-Packet inspection utility for lightweight network traffic monitoring during reconnaissance.
+See [ROADMAP.md](ROADMAP.md) for planned work and [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
 
 ## License
 
