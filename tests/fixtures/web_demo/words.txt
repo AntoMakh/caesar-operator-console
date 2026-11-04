@@ -1,0 +1,3 @@
+admin.html
+about.html
+missing.html
