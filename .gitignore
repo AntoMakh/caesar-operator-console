@@ -4,3 +4,4 @@ __pycache__/
 .github/
 AGENTS.md
 outputs/
+.venv/

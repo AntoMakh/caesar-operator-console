@@ -22,6 +22,23 @@ Each tool is implemented as a module with a metadata file describing its interfa
 - **Multi-Stage Workflow & Pipeline Engine**: Declarative JSON workflow chaining (`pipeline run <name>`) with dynamic output-to-input parameter passing, regex template resolver (`{{VAR}}` and dot-notation `{{item.prop}}`), and iteration loops (`iterate_over`).
 - **Tab Completion**: Context-aware autocompletion for commands, tools, options, and global settings.
 
+## Setup
+
+The test suite has been verified with Python 3.14. From the repository
+root on Windows, create a virtual environment and install the Python
+dependencies.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+.\.venv\Scripts\python.exe caesar.py
+```
+
+Bash modules require `bash`. Individual modules may also require
+executables such as `hashcat`. In Caesar, select a module and run
+`check` to see whether its declared executables are available.
+
 ## Current Modules
 
 ### Bismarck
