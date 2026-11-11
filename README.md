@@ -217,13 +217,13 @@ Global options are stored in Caesar and applied to matching module options. Save
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-The suite currently contains 30 tests covering template substitution, command construction and defaults, unknown option rejection, validation, workflow iteration and failure settings, dependency checks, invalid module metadata, output separation, URL construction, and unique logs. Test processes use harmless Python commands and temporary directories. Network calls in unit tests are mocked. Some tests intentionally print warnings or errors while checking failure behavior.
+The suite currently contains 31 tests covering template substitution, command construction and defaults, unknown option rejection, validation, workflow iteration and failure settings, missing iteration inputs, dependency checks, invalid module metadata, output separation, URL construction, and unique logs. Test processes use harmless Python commands and temporary directories. Network calls in unit tests are mocked. Some tests intentionally print warnings or errors while checking failure behavior.
 
 The local fixture demonstration above additionally exercises real subprocesses and HTTP requests over loopback.
 
 ## Current limits and roadmap
 
-- Workflow shape checks are incomplete. Unknown option names are rejected during command preparation. Unresolved templates retain their original text, and a missing iteration reference currently behaves like an empty result.
+- Workflow shape checks are incomplete. Unknown option names are rejected during command preparation. A missing iteration reference reports an error and follows `fail_fast`, while an existing empty list skips normally. Unresolved templates retain their original text, and iteration input types need further validation.
 - Pipeline arguments are split on whitespace. Use parameter values without spaces for the documented workflow commands.
 - Foreground pipelines run sequentially. Background execution applies to individual tools.
 - Background job exit-status reporting, process-tree cancellation, and exit cleanup need further work.

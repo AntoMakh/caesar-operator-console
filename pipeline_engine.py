@@ -117,7 +117,17 @@ class PipelineEngine:
                     context[stage["output"]] = lines
                     print(f"[+] Saved {len(lines)} items to context['{stage['output']}']")
             else:
-                items_to_loop = context.get(stage["iterate_over"], [])
+                iteration_key = stage["iterate_over"]
+                if iteration_key not in context:
+                    print(
+                        f"[!] Workflow '{workflow_name}', stage '{stage['name']}': "
+                        f"iteration input '{iteration_key}' is missing."
+                    )
+                    if should_fail_fast:
+                        return
+                    continue
+
+                items_to_loop = context[iteration_key]
                 if not items_to_loop:
                     print(f"[!] Nothing to iterate on. Skipping stage.")
                     if "output" in stage:

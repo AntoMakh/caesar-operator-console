@@ -1,4 +1,6 @@
+import io
 import unittest
+from contextlib import redirect_stdout
 from unittest.mock import call, patch
 
 from pipeline_engine import PipelineEngine
@@ -267,6 +269,36 @@ class TestRunWorkflow(unittest.TestCase):
             ["discover.py", "example.com"],
             background=False
         )
+
+    def test_missing_iteration_input_reports_error_and_respects_fail_fast(self):
+        workflow = self.engine.workflows["demo"]
+        workflow["stages"] = [
+            workflow["stages"][1],
+            {
+                "name": "inspect_independent_target",
+                "tool": "inspect",
+                "options": {"TARGET": "https://independent.example.com", "PORT": 443},
+            },
+        ]
+
+        for fail_fast in (True, False):
+            with self.subTest(fail_fast=fail_fast):
+                workflow["fail_fast"] = fail_fast
+                output = io.StringIO()
+                with patch("pipeline_engine.run_module_and_log", return_value=([], True)) as mock_run:
+                    with redirect_stdout(output):
+                        self.engine.run_workflow("demo", {})
+
+                self.assertIn("iteration input 'discovered_targets' is missing", output.getvalue())
+                self.assertNotIn("Nothing to iterate on", output.getvalue())
+                if fail_fast:
+                    mock_run.assert_not_called()
+                else:
+                    mock_run.assert_called_once_with(
+                        "inspect",
+                        ["inspect.py", "https://independent.example.com", "443"],
+                        background=False,
+                    )
 
     def prepare_failure_workflow(self, fail_fast):
         workflow = self.engine.workflows["demo"]
