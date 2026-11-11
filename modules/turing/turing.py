@@ -183,6 +183,7 @@ def main():
         sys.exit(1)
     
     try:
+        print(f"[*] Inspecting {base_url}")
         response = requests.get(base_url, timeout=3)
         evidence = collect_evidence(response)
         signatures = load_signatures()
@@ -197,6 +198,10 @@ def main():
         print(json.dumps(evidence["headers"], indent=4))
         findings = detect_technologies(evidence, path_evidence, signatures)
         findings_with_versions = detect_technology_version(findings, evidence)
+        if not findings_with_versions:
+            print("\n[*] No matching technology signatures found.")
+            return
+
         print("\n[+] Detected Technologies:")
         for technology, details in findings_with_versions.items():
             matches_summary = ", ".join(details["matched_values"])
