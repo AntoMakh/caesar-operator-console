@@ -94,6 +94,15 @@ class TestBuildCommand(unittest.TestCase):
             ["example.py", "example.com"]
         )
 
+    def test_rejects_unknown_option_even_when_unset(self):
+        for value in (4, None):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "Unknown option 'THREDS'"):
+                    self.engine.build_command(
+                        "example",
+                        {"TARGET": "example.com", "THREDS": value},
+                    )
+
     def test_omits_unset_optional_values(self):
         options = {
             "TARGET": "example.com",

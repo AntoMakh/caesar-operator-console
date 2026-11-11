@@ -8,6 +8,11 @@ def build_module_command(
     option_values: dict[str, Any],
 ) -> list[str]:
     """Build command arguments using supplied values and module defaults."""
+    for option_name in option_values:
+        if option_name not in tool["options"]:
+            tool_name = tool.get("name", tool["entry"])
+            raise ValueError(f"Unknown option '{option_name}' for tool '{tool_name}'")
+
     command = [tool["entry"]]
 
     for option_name in tool["argument_order"]:
