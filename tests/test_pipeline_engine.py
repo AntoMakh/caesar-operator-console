@@ -27,6 +27,41 @@ class TestResolveTemplates(unittest.TestCase):
         )
         self.assertEqual(result, "https://example.com")
 
+    def test_keeps_placeholder_for_missing_variable(self):
+        with patch.object(PipelineEngine, "load_workflows", return_value={}):
+            engine = PipelineEngine()
+
+        result = engine.resolve_templates(
+            "https://{{DOMAIN}}:{{PORT}}",
+            {"DOMAIN": "example.com"}
+        )
+        self.assertEqual(result, "https://example.com:{{PORT}}")
+
+    def test_keeps_placeholder_for_missing_nested_variable(self):
+        with patch.object(PipelineEngine, "load_workflows", return_value={}):
+            engine = PipelineEngine()
+
+        values = [
+            {"item": {"domain": "example.com"}},
+            {"item": "example.com"},
+            {},
+        ]
+
+        for context in values:
+            with self.subTest(context=context):
+                result = engine.resolve_templates("https://{{item.host}}", context)
+                self.assertEqual(result, "https://{{item.host}}")
+
+    def test_converts_non_string_context_values_to_text(self):
+        with patch.object(PipelineEngine, "load_workflows", return_value={}):
+            engine = PipelineEngine()
+
+        result = engine.resolve_templates(
+            "{{HOST}}:{{PORT}} quiet={{QUIET}}",
+            {"HOST": "example.com", "PORT": 443, "QUIET": True}
+        )
+        self.assertEqual(result, "example.com:443 quiet=True")
+
     def test_preserves_non_string_values(self):
         with patch.object(PipelineEngine, "load_workflows", return_value={}):
             engine = PipelineEngine()
