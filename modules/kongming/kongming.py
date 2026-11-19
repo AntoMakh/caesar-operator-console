@@ -15,6 +15,7 @@ YELLOW = "\033[33m"
 RED = "\033[31m"
 BLUE = "\033[36m"
 RESET = "\033[0m"
+MAX_TIMEOUT_SECONDS = 300
 
 
 def parse_arguments():
@@ -28,7 +29,12 @@ def parse_arguments():
         help="Ports to scan, e.g. 1-1024 or 22,80,443 or 20-25,80",
     )
     parser.add_argument("--threads", dest="THREADS", default="50", help="Number of worker threads")
-    parser.add_argument("--timeout", dest="TIMEOUT", default="1.0", help="Connection timeout in seconds")
+    parser.add_argument(
+        "--timeout",
+        dest="TIMEOUT",
+        default="1.0",
+        help=f"Connection timeout in seconds (greater than 0, up to {MAX_TIMEOUT_SECONDS})",
+    )
     parser.add_argument(
         "--quiet",
         dest="QUIET",
@@ -66,6 +72,8 @@ def parse_ports(spec: str) -> List[int]:
                 raise ValueError(f"invalid port range '{part}'") from None
             if start > end:
                 start, end = end, start
+            if not 1 <= start <= end <= 65535:
+                raise ValueError(f"port range '{part}' is out of range 1-65535")
             for port in range(start, end + 1):
                 ports.add(port)
         else:
@@ -116,8 +124,15 @@ def main():
 
     try:
         timeout = float(args.TIMEOUT)
+        if not 0 < timeout <= MAX_TIMEOUT_SECONDS:
+            raise ValueError
     except ValueError:
-        timeout = 1.0
+        print(
+            f"{RED}[!] Invalid --timeout value: enter a number greater than 0 "
+            f"and no more than {MAX_TIMEOUT_SECONDS} seconds.{RESET}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
 
     try:
         resolved = socket.gethostbyname(host)

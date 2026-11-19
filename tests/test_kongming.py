@@ -1,9 +1,11 @@
+import argparse
 import io
 import socket
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from unittest.mock import MagicMock, patch
 
+from modules.kongming import kongming
 from modules.kongming.kongming import clean_target, parse_ports, scan_port
 
 
@@ -41,6 +43,42 @@ class TestParsePorts(unittest.TestCase):
     def test_rejects_out_of_range_ports(self):
         with self.assertRaisesRegex(ValueError, "out of range"):
             parse_ports("0,70000")
+
+    def test_rejects_out_of_range_endpoints_before_expansion(self):
+        with patch.object(kongming, "range", create=True) as expand_range:
+            with self.assertRaisesRegex(ValueError, "out of range"):
+                parse_ports("1-65536")
+
+        expand_range.assert_not_called()
+
+
+class TestInvalidTimeout(unittest.TestCase):
+    def test_rejects_invalid_timeout_before_resolving_target(self):
+        for timeout in ("invalid", "-1", "0", "nan", "inf", "1e20"):
+            with self.subTest(timeout=timeout):
+                args = argparse.Namespace(
+                    TARGET="127.0.0.1",
+                    PORTS="80",
+                    THREADS="1",
+                    TIMEOUT=timeout,
+                    QUIET=True,
+                )
+                output = io.StringIO()
+                with (
+                    patch.object(kongming, "parse_arguments", return_value=args),
+                    patch.object(
+                        kongming.socket,
+                        "gethostbyname",
+                        side_effect=AssertionError("Unexpected DNS lookup"),
+                    ) as resolve,
+                    redirect_stderr(output),
+                    self.assertRaises(SystemExit) as error,
+                ):
+                    kongming.main()
+
+                resolve.assert_not_called()
+                self.assertEqual(error.exception.code, 1)
+                self.assertIn("Invalid --timeout value", output.getvalue())
 
 
 class TestCleanTarget(unittest.TestCase):
