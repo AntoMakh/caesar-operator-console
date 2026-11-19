@@ -132,7 +132,7 @@ Foreground runs return nonblank, stripped stdout lines on success. Stderr remain
 | Magellan | DNS subdomain enumeration | Python |
 | Mercator | Certificate transparency subdomain enumeration via crt.sh | Python |
 | Napoleon | DNS zone transfer checks | Bash |
-| Prometheus | SUID/SGID file discovery and optional GTFOBins lookup | Python |
+| Prometheus | SUID/SGID file discovery and optional GTFOBins lookup | Bash |
 | SunTzu | Web path enumeration | Python |
 | Turing | Web technology signature matching | Python |
 
