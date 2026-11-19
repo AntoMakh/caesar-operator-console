@@ -17,6 +17,7 @@ class OptionSchema(TypedDict, total=False):
 class ToolSchema(TypedDict, total=False):
     name: str
     description: str
+    category: str
     entry: str
     options: Dict[str, OptionSchema]
     argument_order: List[str]
@@ -52,6 +53,7 @@ def normalize_module(metadata: dict, module_path: str) -> ToolSchema:
     return {
         "name": metadata.get("name", ""),
         "description": metadata.get("description", ""),
+        "category": metadata.get("category", "uncategorized"),
         "entry": entry_path,
         "options": options,
         "argument_order": argument_order,

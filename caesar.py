@@ -185,11 +185,36 @@ Welcome to the Caesar Operator Console. Type help to list commands.
     def default(self, arg):
         print("Unknown command: " + arg +". Type 'help' to see available commands.")
 
+    tool_phases = [
+        ("passive", "Veni  -  passive reconnaissance (gather without touching the target)"),
+        ("active", "Vidi  -  active reconnaissance (probe the target directly)"),
+        ("exploit", "Vici  -  exploitation and post-exploitation (take the machine)"),
+    ]
+
     def do_tools(self, arg):
+        """list available tools grouped by Veni, Vidi, and Vici phases."""
         print("Available tools:")
+        if not self.tools:
+            return
         name_width = max(len(tool_name) for tool_name in self.tools)
-        for tool_name, tool_info in self.tools.items():
-            print(f" - {tool_name:<{name_width}}  {tool_info['description']}")
+        shown = set()
+        for category, heading in self.tool_phases:
+            members = [
+                (name, info)
+                for name, info in self.tools.items()
+                if info.get("category") == category
+            ]
+            if not members:
+                continue
+            print(f"\n  {heading}")
+            for name, info in members:
+                print(f"    {name:<{name_width}}  {info['description']}")
+                shown.add(name)
+        others = [(name, info) for name, info in self.tools.items() if name not in shown]
+        if others:
+            print("\n  Other")
+            for name, info in others:
+                print(f"    {name:<{name_width}}  {info['description']}")
 
     def do_select(self, arg):
         if(arg.strip() == ""):

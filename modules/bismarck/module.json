@@ -1,6 +1,7 @@
 {
     "name": "bismarck",
     "description": "Bismarck service banner grabber",
+    "category": "active",
     "entry": "bismarck_wrapper.sh",
     "options": {
         "TARGET": {

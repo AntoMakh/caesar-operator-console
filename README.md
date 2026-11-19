@@ -139,6 +139,8 @@ Foreground runs return nonblank, stripped stdout lines on success. Stderr remain
 
 Run `tools`, `info <tool>`, and `options` to inspect available settings. Module behavior and dependencies differ, and platform-specific tools need an appropriate environment.
 
+`tools` groups the modules by the phase declared in each `module.json` `category` field: `passive` reconnaissance (Veni), `active` reconnaissance (Vidi), and `exploitation` (Vici). The headings are a reading aid only; any module is selected and run directly with `select <tool>` regardless of its phase. A module with no recognized category is listed under "Other".
+
 ## Architecture
 
 ```text
@@ -173,6 +175,7 @@ Place the entry script and `module.json` in `modules/<tool-name>/`. The folder n
 {
   "name": "example",
   "description": "Example Python tool",
+  "category": "active",
   "entry": "example.py",
   "argument_order": ["TARGET", "THREADS"],
   "dependencies": [],

@@ -1,6 +1,7 @@
 {
     "name": "suntzu",
     "description": "Directory enumeration tool",
+    "category": "active",
     "entry": "suntzu.py",
     "options": {
         "TARGET": {

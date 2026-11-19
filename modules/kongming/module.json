@@ -1,6 +1,7 @@
 {
     "name": "kongming",
     "description": "Kongming TCP connect port scanner",
+    "category": "active",
     "entry": "kongming.py",
     "options": {
         "TARGET": {
