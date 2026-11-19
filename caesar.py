@@ -6,6 +6,7 @@ from module_loader import load_modules, ToolSchema, OptionSchema
 import json
 import os
 from module_runner import run_module_and_log
+from banner import render_banner
 import shutil
 import threading
 from pipeline_engine import PipelineEngine
@@ -23,28 +24,6 @@ except ImportError:
 
 
 class CaesarConsole(cmd.Cmd):
-    intro = """
-WRITTEN BY
- ________
-/        \\
-| b1smrk |
-\\________/
-                                     |__
-                                     |\\/
-                                     ---
-                                     / | [
-                              !      | |||
-                            _/|     _/|-++'
-                        +  +--|    |--|--|_ |-
-                     { /|__|  |/\\__|  |--- |||__/
-                    +---------------___[}-_===_.'____                 /\\
-                ____`-' ||___-{]_| _[}-  |     |_[___\\==--            \\/   _
- __..._____--==/___]_|__|_____________________________[___\\==--____,------' .7
-|                                                                          /
- \\_________________________________________________________________________|
-
-Welcome to the Caesar Operator Console. Type help to list commands.
-"""
     prompt = 'caesar > '
     settings_file = ".caesar_settings.json"
 
@@ -55,6 +34,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         self.jobs = {}
         self.job_counter = 1
         self.pipeline_engine = PipelineEngine(self.tools)
+        self.intro = render_banner(len(self.tools), len(self.pipeline_engine.workflows))
 
     current_tool = None
 
