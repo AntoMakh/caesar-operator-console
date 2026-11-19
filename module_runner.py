@@ -53,7 +53,10 @@ def run_module_and_log(tool_name: str, command: list, output_dir: str = "outputs
             stdout=log_file,
             stderr=subprocess.STDOUT,
             text=True,
-            creationflags=creationflags
+            creationflags=creationflags,
+            # Put the job in its own process group/session so the console can
+            # later terminate the whole tree, not just the direct child.
+            start_new_session=(os.name != "nt"),
         )
         return process, log_path
 

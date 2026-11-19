@@ -10,12 +10,18 @@ import requests
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Mercator crt.sh subdomain enumeration tool")
     parser.add_argument("TARGET", help="The target domain as it exists on the internet")
+    parser.add_argument(
+        "--quiet",
+        dest="QUIET",
+        action="store_true",
+        help="Output only discovered subdomains for pipelining",
+    )
     return parser.parse_args()
 
 
 def validate_target(target):
     if not target or "." not in target:
-        print("Error: TARGET must be a valid domain name")
+        print("[!] Error: TARGET must be a valid domain name", file=sys.stderr)
         sys.exit(1)
 
 
@@ -31,10 +37,10 @@ def fetch_certificate_data(target):
         response.raise_for_status()
         return response.json()
     except requests.RequestException as error:
-        print(f"Error retrieving crt.sh data: {error}")
+        print(f"[!] Error retrieving crt.sh data: {error}", file=sys.stderr)
         sys.exit(1)
     except ValueError:
-        print("Error: crt.sh did not return valid JSON")
+        print("[!] Error: crt.sh did not return valid JSON", file=sys.stderr)
         sys.exit(1)
 
 
@@ -58,9 +64,11 @@ def extract_subdomains(certificates):
     return subdomains
 
 
-def print_subdomains(subdomains):
+def print_subdomains(subdomains, quiet=False):
+    if not quiet:
+        print(f"[*] Discovered {len(subdomains)} unique names from crt.sh")
     for subdomain in sorted(subdomains):
-        print(subdomain)
+        print(subdomain if quiet else f"[+] {subdomain}")
 
 
 def main():
@@ -69,7 +77,7 @@ def main():
 
     certificates = fetch_certificate_data(args.TARGET)
     subdomains = extract_subdomains(certificates)
-    print_subdomains(subdomains)
+    print_subdomains(subdomains, args.QUIET)
 
 if __name__ == "__main__":
     main()

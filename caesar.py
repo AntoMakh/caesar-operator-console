@@ -5,6 +5,8 @@ import subprocess
 from module_loader import load_modules, ToolSchema, OptionSchema
 import json
 import os
+import shlex
+import signal
 from module_runner import run_module_and_log
 from banner import render_banner
 import shutil
@@ -160,6 +162,12 @@ class CaesarConsole(cmd.Cmd):
         print("pipeline [list|run]    - List or execute automated workflows")
 
     def do_exit(self, arg):
+        running = [job for job in self.jobs.values() if job["process"].poll() is None]
+        for job in running:
+            self._mark_stopped(job, "Terminated")
+            self._terminate_process(job["process"])
+        if running:
+            print(f"[*] Terminated {len(running)} running background job(s) on exit.")
         print("[*] Exiting the Caesar Operator Console. Goodbye!")
         return True
     def default(self, arg):
@@ -451,6 +459,7 @@ class CaesarConsole(cmd.Cmd):
                 "id": job_id,
                 "tool": self.current_tool,
                 "status": "Running",
+                "exit_code": None,
                 "log_path": log_path,
                 "process": process,
                 "timer": None,
@@ -465,12 +474,13 @@ class CaesarConsole(cmd.Cmd):
             run_module_and_log(self.current_tool, command, background=False)
 
     def _watch_job(self, job_id: int, process: subprocess.Popen) -> None:
-        """watcher that gets end time of subprocess (job) running in backgroud"""
+        """watcher that records the exit status of a background job."""
         process.wait()
         if job_id in self.jobs:
             job = self.jobs[job_id]
             if job["status"] == "Running":
-                job["status"] = "Finished"
+                job["exit_code"] = process.returncode
+                job["status"] = "Finished" if process.returncode == 0 else "Failed"
                 job["end_time"] = time.time()
                 if job.get("timer"):
                     job["timer"].cancel()
@@ -590,13 +600,15 @@ class CaesarConsole(cmd.Cmd):
             print("  No background jobs.")
             return
         
-        print(f"{'JOB_ID':<10}{'TOOL':<18}{'STATUS':<14}{'DURATION':<12}{'LOG FILE':<40}")
-        print("-" * 95)
+        print(f"{'JOB_ID':<10}{'TOOL':<18}{'STATUS':<14}{'EXIT':<6}{'DURATION':<12}{'LOG FILE':<40}")
+        print("-" * 101)
         for job_id, job in self.jobs.items():
             end_time = job["end_time"] if job["end_time"] else time.time()
             duration_str = self._format_duration(end_time - job["start_time"])
+            exit_code = job.get("exit_code")
+            exit_str = "-" if exit_code is None else str(exit_code)
 
-            print(f"[{job_id}]       {job['tool']:<18}{job['status']:<14}{duration_str:<12}{job['log_path']:<40}")
+            print(f"[{job_id}]       {job['tool']:<18}{job['status']:<14}{exit_str:<6}{duration_str:<12}{job['log_path']:<40}")
     
     def _format_duration(self, seconds: float) -> str:
         total_seconds = int(seconds)
@@ -629,6 +641,39 @@ class CaesarConsole(cmd.Cmd):
         except ValueError:
             print("[!] Job ID must be an integer.")
 
+    def _terminate_process(self, process: subprocess.Popen) -> None:
+        """stop a background process and the children it started."""
+        if process.poll() is not None:
+            return
+        try:
+            if os.name == "nt":
+                subprocess.run(
+                    f"taskkill /pid {process.pid} /F /T",
+                    shell=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            else:
+                group = os.getpgid(process.pid)
+                os.killpg(group, signal.SIGTERM)
+                try:
+                    process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    os.killpg(group, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError, OSError):
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+    def _mark_stopped(self, job: dict, status: str) -> None:
+        """record a job's final stopped state and cancel any pending timer."""
+        job["status"] = status
+        job["end_time"] = time.time()
+        if job.get("timer"):
+            job["timer"].cancel()
+            job["timer"] = None
+
     def do_kill(self, arg):
         """terminate a running background job by job id."""
         if not arg.strip():
@@ -641,12 +686,9 @@ class CaesarConsole(cmd.Cmd):
                 return
             job = self.jobs[job_id]
             if job["process"].poll() is None:
-                job["process"].kill()
-                job["status"] = "Terminated"
-                job["end_time"] = time.time()
-                if job.get("timer"):
-                    job["timer"].cancel()
-                    job["timer"] = None
+                # Mark first so the watcher thread does not overwrite the status.
+                self._mark_stopped(job, "Terminated")
+                self._terminate_process(job["process"])
                 print(f"[-] Terminated job [{job_id}] ({job['tool']}).")
             else:
                 print(f"[!] Job [{job_id}] is already finished.")
@@ -654,21 +696,24 @@ class CaesarConsole(cmd.Cmd):
             print("[!] Job ID must be an integer.")
 
     def _timeout_job(self, job_id: int) -> None:
-        """calls kill when job timer expires"""
+        """terminate a job and its children when its timer expires."""
         if job_id in self.jobs:
             job = self.jobs[job_id]
             if job["process"].poll() is None:
-                job["process"].kill()
-                job["status"] = "Timed Out"
-                job["end_time"] = time.time()
+                self._mark_stopped(job, "Timed Out")
+                self._terminate_process(job["process"])
 
     def do_pipeline(self, arg):
-        parts = arg.strip().split()
+        try:
+            parts = shlex.split(arg)
+        except ValueError as error:
+            print(f"[!] Could not parse arguments: {error}")
+            return
         if not parts or parts[0] == "list":
             for workflow, workflow_items in self.pipeline_engine.workflows.items():
                 print(f"- {workflow}")
                 for stage in workflow_items["stages"]:
-                    print(f"\t{stage["tool"]:<15}{stage["name"]}")
+                    print(f"\t{stage['tool']:<15}{stage['name']}")
             return
 
         elif parts[0] == "run":

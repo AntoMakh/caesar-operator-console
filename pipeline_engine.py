@@ -13,12 +13,69 @@ class StageSchema(TypedDict):
     options: NotRequired[Dict[str, Any]]
     output: NotRequired[str]
     iterate_over: NotRequired[str]
+    fail_fast: NotRequired[bool]
 
-class WorkflowSchema(TypedDict, total=False):
+class WorkflowSchema(TypedDict):
     workflow_name: str
-    required_inputs: List[str]
+    required_inputs: NotRequired[List[str]]
     fail_fast: NotRequired[bool]
     stages: list[StageSchema]
+
+def is_non_empty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+def validate_stage_fields(stage: Any, index: int, earlier_outputs: List[str]) -> None:
+    """Check the field types and references needed to run one stage."""
+    if not isinstance(stage, dict):
+        raise ValueError(f"stage {index} must be an object")
+
+    if not is_non_empty_string(stage.get("name")):
+        raise ValueError(f"stage {index}: 'name' must be a non-empty string")
+    label = f"stage '{stage['name']}'"
+
+    if not is_non_empty_string(stage.get("tool")):
+        raise ValueError(f"{label}: 'tool' must be a non-empty string")
+
+    if not isinstance(stage.get("options", {}), dict):
+        raise ValueError(f"{label}: 'options' must be an object")
+
+    if "fail_fast" in stage and not isinstance(stage["fail_fast"], bool):
+        raise ValueError(f"{label}: 'fail_fast' must be true or false")
+
+    for field in ("output", "iterate_over"):
+        if field in stage and not is_non_empty_string(stage[field]):
+            raise ValueError(f"{label}: '{field}' must be a non-empty string")
+
+    iteration_key = stage.get("iterate_over")
+    if iteration_key is not None and iteration_key not in earlier_outputs:
+        raise ValueError(
+            f"{label}: 'iterate_over' value '{iteration_key}' "
+            f"is not the output of an earlier stage"
+        )
+
+def validate_workflow_fields(workflow: Dict[str, Any]) -> None:
+    """Check the field types and references needed to run a workflow."""
+    if not is_non_empty_string(workflow.get("workflow_name")):
+        raise ValueError("'workflow_name' must be a non-empty string")
+
+    required_inputs = workflow.get("required_inputs", [])
+    if not isinstance(required_inputs, list) or not all(
+        isinstance(value, str) for value in required_inputs
+    ):
+        raise ValueError("'required_inputs' must be a list of strings")
+
+    if "fail_fast" in workflow and not isinstance(workflow["fail_fast"], bool):
+        raise ValueError("'fail_fast' must be true or false")
+
+    stages = workflow.get("stages")
+    if not isinstance(stages, list):
+        raise ValueError("'stages' must be a list")
+
+    earlier_outputs = []
+    for index, stage in enumerate(stages, start=1):
+        validate_stage_fields(stage, index, earlier_outputs)
+        if "output" in stage:
+            earlier_outputs.append(stage["output"])
 
 class PipelineEngine:
     def __init__(self, tools: Dict[str, Any] = None):
@@ -33,21 +90,27 @@ class PipelineEngine:
             workflow_path = os.path.join(workflows_dir, workflow_name)
             if not workflow_path.endswith(".json"):
                 continue
-            with open(workflow_path, "r") as f:
-                try:
+            try:
+                with open(workflow_path, "r", encoding="utf-8-sig") as f:
                     workflow = json.load(f)
-                except json.JSONDecodeError as e:
-                    print(f"[!] Warning: failed to parse {workflow_name}: {e}")
-                    continue
-            
-            name = workflow.get("workflow_name")
-            if name:
-                workflows[name] = workflow
-            else:
-                print(f"[!] Warning: {workflow_name} is missing a workflow_name field")
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
+                print(f"[!] Warning: failed to parse {workflow_name}: {e}")
                 continue
+
+            if not isinstance(workflow, dict):
+                print(f"[!] Warning: {workflow_name} must contain a JSON object. Skipping.")
+                continue
+
+            try:
+                validate_workflow_fields(workflow)
+            except ValueError as error:
+                print(f"[!] Warning: invalid workflow {workflow_name}: {error}. Skipping.")
+                continue
+
+            workflows[workflow["workflow_name"]] = workflow
         return workflows
-        
+
+
     def run_workflow(self, workflow_name: str, initial_context: Dict[str, Any]) -> None:
         """
         Run the stages of a loaded workflow in order.
@@ -78,7 +141,7 @@ class PipelineEngine:
             if tool_name not in self.tools:
                 print(f"[!] ERROR: Workflow {workflow_name}, stage {stage['name']}: unknown tool {tool_name}.\nStopping workflow.")
                 break
-            print(f"[*] Running stage: {stage["name"]} ({tool_name})")
+            print(f"[*] Running stage: {stage['name']} ({tool_name})")
             should_fail_fast = stage.get("fail_fast", workflow.get("fail_fast", False))
             tool = self.tools[tool_name]
             missing = get_missing_dependencies(tool)
@@ -93,7 +156,7 @@ class PipelineEngine:
                 continue
             if "iterate_over" not in stage:
                 resolved_options = {}
-                for option_name, option_value in stage["options"].items():
+                for option_name, option_value in stage.get("options", {}).items():
                     resolved_options[option_name] = self.resolve_templates(option_value, context)
                 try:
                     command = self.build_command(tool_name, resolved_options)
@@ -139,7 +202,7 @@ class PipelineEngine:
                         context["item"] = item
 
                         resolved_options = {}
-                        for option_name, option_value in stage["options"].items():
+                        for option_name, option_value in stage.get("options", {}).items():
                             resolved_options[option_name] = self.resolve_templates(option_value, context)
                         
                         try:
@@ -158,6 +221,9 @@ class PipelineEngine:
                                 return
                             else:
                                 continue
+                    # Remove the loop variable so a later stage cannot resolve a
+                    # stale {{item}} from a previous iteration.
+                    context.pop("item", None)
                     if "output" in stage:
                         context[stage["output"]] = stage_results
                         print(f"[+] Saved {len(stage_results)} items to context['{stage['output']}']")

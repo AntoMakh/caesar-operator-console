@@ -15,7 +15,7 @@ The core uses Python's standard library for the console, subprocess execution, t
 
 ## Setup
 
-The test suite and local web demo have been verified on Windows with Python 3.14. Run commands from the repository root after cloning the repository.
+Caesar requires Python 3.11 or newer because it uses `typing.NotRequired`. The test suite and local web demo have been verified on Windows with Python 3.14, and the offline test suite also passes on Linux with Python 3.11, 3.12, and 3.13. Run commands from the repository root after cloning the repository.
 
 ```powershell
 python -m venv .venv
@@ -30,7 +30,7 @@ The requirements install `requests` and, on Windows, `pyreadline3` for Tab compl
 | PowerShell | `.\.venv\Scripts\Activate.ps1` |
 | Command Prompt | `.venv\Scripts\activate.bat` |
 
-On Linux or macOS, the equivalent environment executable is `.venv/bin/python`. Compatibility of the full module collection on those platforms still needs verification.
+On Linux or macOS, the equivalent environment executable is `.venv/bin/python`. The core console tests pass on Linux, but compatibility of the full module collection on Linux and macOS still needs verification.
 
 Bash modules require `bash` and their declared external utilities. After selecting a module, use `check` to inspect its declared executables. This searches PATH, while `pip` installs Python packages.
 
@@ -116,6 +116,8 @@ In `web_recon.json`, the discovery stage uses `"output": "saved_directories"`. T
 
 Templates substitute context values into strings. Dot notation supports dictionary values such as `{{item.domain}}`. Tool results currently arrive as lists of text lines. An empty iteration list skips the stage.
 
+Workflow files are checked when Caesar starts. A file is skipped with a warning naming the file and stage if it is not a JSON object, has fields of the wrong type, or has an `iterate_over` that does not name the `output` of an earlier stage. A stage without `options` uses the module defaults.
+
 Workflow options override module defaults. Console runs use the currently configured values. Both paths use shared command construction, option validation, and executable dependency lookup. Workflows keep their option values separate from interactive tool settings.
 
 `fail_fast` defaults to `false`, and a stage may override its workflow's setting. An unknown tool stops the workflow when that stage is reached, regardless of `fail_fast`. Earlier stages may already have run.
@@ -133,7 +135,7 @@ Foreground runs return nonblank, stripped stdout lines on success. Stderr remain
 | Magellan | DNS subdomain enumeration | Python |
 | Mercator | Certificate transparency subdomain enumeration via crt.sh | Python |
 | Napoleon | DNS zone transfer checks | Bash |
-| Prometheus | SUID/SGID file discovery and optional GTFOBins lookup | Python |
+| Prometheus | SUID/SGID file discovery and optional GTFOBins lookup | Bash |
 | SunTzu | Web path enumeration | Python |
 | Turing | Web technology signature matching | Python |
 
@@ -221,14 +223,16 @@ Global options are stored in Caesar and applied to matching module options. Save
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-The suite currently contains 31 tests covering template substitution, command construction and defaults, unknown option rejection, validation, workflow iteration and failure settings, missing iteration inputs, dependency checks, invalid module metadata, output separation, URL construction, and unique logs. Test processes use harmless Python commands and temporary directories. Network calls in unit tests are mocked. Some tests intentionally print warnings or errors while checking failure behavior.
+The suite currently contains 58 tests covering template substitution, command construction and defaults, unknown option rejection, validation, workflow iteration and failure settings, missing iteration inputs, workflow field validation, dependency checks, invalid module metadata, output separation, URL construction, unique logs, background job exit status, background process-tree termination, and module behavior for DaVinci, Napoleon, and Mercator. Test processes use harmless Python commands and temporary directories. Network calls in unit tests are mocked. Some tests intentionally print warnings or errors while checking failure behavior.
+
+Continuous integration runs the same `unittest` discovery on Python 3.11, 3.12, and 3.13 for every push to `main` and every pull request (`.github/workflows/tests.yml`). The process-tree termination tests are skipped on non-POSIX runners.
 
 The local fixture demonstration above additionally exercises real subprocesses and HTTP requests over loopback.
 
 ## Current limits and roadmap
 
-- Workflow shape checks are incomplete. Unknown option names are rejected during command preparation. A missing iteration reference reports an error and follows `fail_fast`, while an existing empty list skips normally. Unresolved templates retain their original text, and iteration input types need further validation.
-- Pipeline arguments are split on whitespace. Use parameter values without spaces for the documented workflow commands.
+- Workflow field types and `iterate_over` references are checked at startup, but unknown tools are only detected when their stage is reached. Unknown option names are rejected during command preparation. A missing iteration reference reports an error and follows `fail_fast`, while an existing empty list skips normally. Unresolved templates retain their original text, and iteration input types need further validation.
+- Pipeline arguments are parsed with shell-style quoting. A value containing spaces must be quoted, for example `pipeline run web_recon "TARGET=http://127.0.0.1" "WORDLIST=word list.txt"`.
 - Foreground pipelines run sequentially. Background execution applies to individual tools.
 - Background job exit-status reporting, process-tree cancellation, and exit cleanup need further work.
 - Turing uses heuristic signatures, and header versions or body markers can be missing or misleading.

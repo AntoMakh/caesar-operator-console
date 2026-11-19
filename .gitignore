@@ -1,7 +1,6 @@
 __pycache__/
 *.pyc
 .caesar_settings.json
-.github/
 AGENTS.md
 outputs/
 .venv/

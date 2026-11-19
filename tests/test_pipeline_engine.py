@@ -1,8 +1,12 @@
 import io
+import json
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from contextlib import redirect_stdout
 from unittest.mock import call, patch
 
+from module_loader import load_modules
 from pipeline_engine import PipelineEngine
 
 class TestResolveTemplates(unittest.TestCase):
@@ -26,6 +30,41 @@ class TestResolveTemplates(unittest.TestCase):
             {"item": {"domain": "example.com"}}
         )
         self.assertEqual(result, "https://example.com")
+
+    def test_keeps_placeholder_for_missing_variable(self):
+        with patch.object(PipelineEngine, "load_workflows", return_value={}):
+            engine = PipelineEngine()
+
+        result = engine.resolve_templates(
+            "https://{{DOMAIN}}:{{PORT}}",
+            {"DOMAIN": "example.com"}
+        )
+        self.assertEqual(result, "https://example.com:{{PORT}}")
+
+    def test_keeps_placeholder_for_missing_nested_variable(self):
+        with patch.object(PipelineEngine, "load_workflows", return_value={}):
+            engine = PipelineEngine()
+
+        values = [
+            {"item": {"domain": "example.com"}},
+            {"item": "example.com"},
+            {},
+        ]
+
+        for context in values:
+            with self.subTest(context=context):
+                result = engine.resolve_templates("https://{{item.host}}", context)
+                self.assertEqual(result, "https://{{item.host}}")
+
+    def test_converts_non_string_context_values_to_text(self):
+        with patch.object(PipelineEngine, "load_workflows", return_value={}):
+            engine = PipelineEngine()
+
+        result = engine.resolve_templates(
+            "{{HOST}}:{{PORT}} quiet={{QUIET}}",
+            {"HOST": "example.com", "PORT": 443, "QUIET": True}
+        )
+        self.assertEqual(result, "example.com:443 quiet=True")
 
     def test_preserves_non_string_values(self):
         with patch.object(PipelineEngine, "load_workflows", return_value={}):
@@ -164,6 +203,165 @@ class TestBuildCommand(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "TARGET: a value is required"):
             self.engine.build_command("example", {})
 
+class TestSuntzuCommand(unittest.TestCase):
+    def setUp(self):
+        tools = load_modules()
+        with patch.object(PipelineEngine, "load_workflows", return_value={}):
+            self.engine = PipelineEngine({"suntzu": tools["suntzu"]})
+        self.options = {
+            "TARGET": "http://127.0.0.1",
+            "PORT": "8000",
+            "WORDLIST": "tests/fixtures/web_demo/words.txt",
+            "QUIET": True,
+        }
+
+    def test_excludes_404_by_default(self):
+        command = self.engine.build_command("suntzu", self.options)
+
+        flag_index = command.index("--exclude-codes")
+        self.assertEqual(command[flag_index + 1], "404")
+
+    def test_explicit_exclusions_override_default(self):
+        self.options["EXCLUDED_STATUS_CODES"] = "403,404"
+
+        command = self.engine.build_command("suntzu", self.options)
+
+        flag_index = command.index("--exclude-codes")
+        self.assertEqual(command[flag_index + 1], "403,404")
+        self.assertEqual(
+            self.engine.tools["suntzu"]["options"]["EXCLUDED_STATUS_CODES"]["default"],
+            "404",
+        )
+
+class TestLoadWorkflows(unittest.TestCase):
+    def setUp(self):
+        with patch.object(PipelineEngine, "load_workflows", return_value={}):
+            self.engine = PipelineEngine()
+
+    def test_skips_unreadable_and_non_object_workflows(self):
+        with TemporaryDirectory() as directory:
+            workflows_dir = Path(directory)
+            (workflows_dir / "broken.json").write_text('{"stages":', encoding="utf-8")
+            (workflows_dir / "list_root.json").write_text("[]", encoding="utf-8")
+            (workflows_dir / "string_root.json").write_text('"demo"', encoding="utf-8")
+            (workflows_dir / "valid.json").write_text(
+                '{"workflow_name": "valid", "stages": []}', encoding="utf-8"
+            )
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                workflows = self.engine.load_workflows(directory)
+
+        self.assertEqual(list(workflows), ["valid"])
+        self.assertIn("broken.json", output.getvalue())
+        self.assertIn("list_root.json must contain a JSON object", output.getvalue())
+        self.assertIn("string_root.json must contain a JSON object", output.getvalue())
+
+    def test_skips_workflows_with_invalid_fields(self):
+        valid_stage = {"name": "discover", "tool": "discover", "output": "found"}
+        invalid_workflows = {
+            "no_name": ({"stages": []}, "'workflow_name' must be a non-empty string"),
+            "numeric_name": (
+                {"workflow_name": 7, "stages": []},
+                "'workflow_name' must be a non-empty string",
+            ),
+            "string_inputs": (
+                {"workflow_name": "a", "required_inputs": "DOMAIN", "stages": []},
+                "'required_inputs' must be a list of strings",
+            ),
+            "string_fail_fast": (
+                {"workflow_name": "b", "fail_fast": "yes", "stages": []},
+                "'fail_fast' must be true or false",
+            ),
+            "no_stages": ({"workflow_name": "c"}, "'stages' must be a list"),
+            "stage_not_object": (
+                {"workflow_name": "d", "stages": ["discover"]},
+                "stage 1 must be an object",
+            ),
+            "stage_without_name": (
+                {"workflow_name": "e", "stages": [{"tool": "discover"}]},
+                "stage 1: 'name' must be a non-empty string",
+            ),
+            "stage_without_tool": (
+                {"workflow_name": "f", "stages": [{"name": "discover"}]},
+                "stage 'discover': 'tool' must be a non-empty string",
+            ),
+            "list_options": (
+                {"workflow_name": "g", "stages": [dict(valid_stage, options=[])]},
+                "stage 'discover': 'options' must be an object",
+            ),
+            "stage_string_fail_fast": (
+                {"workflow_name": "h", "stages": [dict(valid_stage, fail_fast="no")]},
+                "stage 'discover': 'fail_fast' must be true or false",
+            ),
+            "numeric_output": (
+                {"workflow_name": "i", "stages": [dict(valid_stage, output=3)]},
+                "stage 'discover': 'output' must be a non-empty string",
+            ),
+            "unknown_iteration": (
+                {
+                    "workflow_name": "j",
+                    "stages": [
+                        valid_stage,
+                        {"name": "inspect", "tool": "inspect", "iterate_over": "missing"},
+                    ],
+                },
+                "stage 'inspect': 'iterate_over' value 'missing' "
+                "is not the output of an earlier stage",
+            ),
+            "iterates_over_own_output": (
+                {
+                    "workflow_name": "k",
+                    "stages": [dict(valid_stage, iterate_over="found")],
+                },
+                "stage 'discover': 'iterate_over' value 'found' "
+                "is not the output of an earlier stage",
+            ),
+        }
+
+        with TemporaryDirectory() as directory:
+            for file_name, (workflow, _) in invalid_workflows.items():
+                (Path(directory) / f"{file_name}.json").write_text(
+                    json.dumps(workflow), encoding="utf-8"
+                )
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                workflows = self.engine.load_workflows(directory)
+
+        self.assertEqual(workflows, {})
+        for file_name, (_, message) in invalid_workflows.items():
+            with self.subTest(file_name=file_name):
+                self.assertIn(
+                    f"invalid workflow {file_name}.json: {message}",
+                    output.getvalue(),
+                )
+
+    def test_loads_workflow_that_iterates_over_earlier_output(self):
+        workflow = {
+            "workflow_name": "chained",
+            "fail_fast": False,
+            "required_inputs": ["DOMAIN"],
+            "stages": [
+                {"name": "discover", "tool": "discover", "output": "found"},
+                {
+                    "name": "inspect",
+                    "tool": "inspect",
+                    "iterate_over": "found",
+                    "fail_fast": True,
+                    "options": {"TARGET": "{{item}}"},
+                },
+            ],
+        }
+
+        with TemporaryDirectory() as directory:
+            (Path(directory) / "chained.json").write_text(
+                json.dumps(workflow), encoding="utf-8"
+            )
+            workflows = self.engine.load_workflows(directory)
+
+        self.assertEqual(workflows, {"chained": workflow})
+
 class TestRunWorkflow(unittest.TestCase):
     def setUp(self):
         tools = {
@@ -218,6 +416,42 @@ class TestRunWorkflow(unittest.TestCase):
             ]
         }
         
+    def test_item_does_not_leak_into_a_later_stage(self):
+        self.engine.workflows["leaky"] = {
+            "workflow_name": "leaky",
+            "stages": [
+                {
+                    "name": "discover",
+                    "tool": "discover",
+                    "options": {"DOMAIN": "{{DOMAIN}}"},
+                    "output": "targets",
+                },
+                {
+                    "name": "inspect_each",
+                    "tool": "inspect",
+                    "iterate_over": "targets",
+                    "options": {"TARGET": "https://{{item}}"},
+                },
+                {
+                    "name": "final",
+                    "tool": "inspect",
+                    "options": {"TARGET": "{{item}}"},
+                },
+            ],
+        }
+
+        with patch("pipeline_engine.run_module_and_log") as mock_run:
+            mock_run.side_effect = [
+                (["a.example.com"], True),
+                (["inspected"], True),
+                (["final"], True),
+            ]
+            self.engine.run_workflow("leaky", {"DOMAIN": "example.com"})
+
+        # The final, non-iterating stage must not resolve {{item}} to the last
+        # loop value; it stays literal because item was cleared after the loop.
+        self.assertEqual(mock_run.call_args_list[-1].args[1], ["inspect.py", "{{item}}"])
+
     def test_passes_discovered_domains_to_inspection(self):
         with patch("pipeline_engine.run_module_and_log") as mock_run:
             mock_run.side_effect = [
@@ -409,3 +643,26 @@ class TestRunWorkflow(unittest.TestCase):
                 )
 
         mock_run.assert_not_called()
+
+    def test_stage_without_options_uses_module_defaults(self):
+        self.engine.tools["discover"]["options"]["DOMAIN"]["default"] = "example.com"
+        self.engine.tools["inspect"]["options"]["TARGET"]["default"] = "https://default"
+        stages = self.engine.workflows["demo"]["stages"]
+        del stages[0]["options"]
+        del stages[1]["options"]
+
+        with patch("pipeline_engine.run_module_and_log") as mock_run:
+            mock_run.side_effect = [
+                (["alpha.example.com"], True),
+                (["alpha: nginx"], True),
+            ]
+
+            self.engine.run_workflow("demo", {})
+
+        self.assertEqual(
+            mock_run.call_args_list,
+            [
+                call("discover", ["discover.py", "example.com"], background=False),
+                call("inspect", ["inspect.py", "https://default"], background=False),
+            ],
+        )
