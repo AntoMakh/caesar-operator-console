@@ -24,11 +24,11 @@ PORTRAIT = r"""⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⣴⣶⣿⣿⢿⡶⠆⠀⠀�
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠉⠉⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀"""
 
 # Per-cell laurel mask taken from the reference art: G = gold leaf, H = head.
-MASK = """          HHHGGGGGG   GH      
-        HHHHHGGG GGGGGGH      
-      HHGGGGG GG GG GGGGH     
-      HHGG GG GG  GGGGGHH     
-     GGGGG GGGGGGG GGHHHH     
+MASK = """          HHHHHHHGG   GG      
+        HHHHHHHH HHGGGGG      
+      HHHHHHH HH HH GGGGG     
+      HHHH HH HH  GGGGGGG     
+     GGGGG GGGGGGG HGGGGG     
      GG GGGGGGG HHHHHHHHHH    
   GGGHGGGGGG HHHHHHHHHHHHHH   
   GG HHHHHHHHHHHHHHHHHHHHHH   
