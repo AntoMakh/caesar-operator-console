@@ -663,7 +663,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             for workflow, workflow_items in self.pipeline_engine.workflows.items():
                 print(f"- {workflow}")
                 for stage in workflow_items["stages"]:
-                    print(f"\t{stage["tool"]:<15}{stage["name"]}")
+                    print(f"\t{stage['tool']:<15}{stage['name']}")
             return
 
         elif parts[0] == "run":
