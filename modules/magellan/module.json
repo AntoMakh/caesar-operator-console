@@ -1,6 +1,7 @@
 {
     "name": "magellan",
     "description": "Magellan multi-threaded DNS subdomain enumerator",
+    "category": "passive",
     "entry": "magellan.py",
     "options": {
         "DOMAIN": {

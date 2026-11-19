@@ -1,6 +1,7 @@
 {
     "name": "judas",
     "description": "Judas flag keyword Source Code grabber from directories",
+    "category": "active",
     "entry": "judas_wrapper.sh",
     "options": {
         "HOST": {
