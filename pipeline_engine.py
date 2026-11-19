@@ -221,6 +221,9 @@ class PipelineEngine:
                                 return
                             else:
                                 continue
+                    # Remove the loop variable so a later stage cannot resolve a
+                    # stale {{item}} from a previous iteration.
+                    context.pop("item", None)
                     if "output" in stage:
                         context[stage["output"]] = stage_results
                         print(f"[+] Saved {len(stage_results)} items to context['{stage['output']}']")

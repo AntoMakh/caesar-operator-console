@@ -416,6 +416,42 @@ class TestRunWorkflow(unittest.TestCase):
             ]
         }
         
+    def test_item_does_not_leak_into_a_later_stage(self):
+        self.engine.workflows["leaky"] = {
+            "workflow_name": "leaky",
+            "stages": [
+                {
+                    "name": "discover",
+                    "tool": "discover",
+                    "options": {"DOMAIN": "{{DOMAIN}}"},
+                    "output": "targets",
+                },
+                {
+                    "name": "inspect_each",
+                    "tool": "inspect",
+                    "iterate_over": "targets",
+                    "options": {"TARGET": "https://{{item}}"},
+                },
+                {
+                    "name": "final",
+                    "tool": "inspect",
+                    "options": {"TARGET": "{{item}}"},
+                },
+            ],
+        }
+
+        with patch("pipeline_engine.run_module_and_log") as mock_run:
+            mock_run.side_effect = [
+                (["a.example.com"], True),
+                (["inspected"], True),
+                (["final"], True),
+            ]
+            self.engine.run_workflow("leaky", {"DOMAIN": "example.com"})
+
+        # The final, non-iterating stage must not resolve {{item}} to the last
+        # loop value; it stays literal because item was cleared after the loop.
+        self.assertEqual(mock_run.call_args_list[-1].args[1], ["inspect.py", "{{item}}"])
+
     def test_passes_discovered_domains_to_inspection(self):
         with patch("pipeline_engine.run_module_and_log") as mock_run:
             mock_run.side_effect = [
