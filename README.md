@@ -15,7 +15,7 @@ The core uses Python's standard library for the console, subprocess execution, t
 
 ## Setup
 
-The test suite and local web demo have been verified on Windows with Python 3.14. Run commands from the repository root after cloning the repository.
+Caesar requires Python 3.11 or newer because it uses `typing.NotRequired`. The test suite and local web demo have been verified on Windows with Python 3.14, and the offline test suite also passes on Linux with Python 3.11, 3.12, and 3.13. Run commands from the repository root after cloning the repository.
 
 ```powershell
 python -m venv .venv
@@ -30,7 +30,7 @@ The requirements install `requests` and, on Windows, `pyreadline3` for Tab compl
 | PowerShell | `.\.venv\Scripts\Activate.ps1` |
 | Command Prompt | `.venv\Scripts\activate.bat` |
 
-On Linux or macOS, the equivalent environment executable is `.venv/bin/python`. Compatibility of the full module collection on those platforms still needs verification.
+On Linux or macOS, the equivalent environment executable is `.venv/bin/python`. The core console tests pass on Linux, but compatibility of the full module collection on Linux and macOS still needs verification.
 
 Bash modules require `bash` and their declared external utilities. After selecting a module, use `check` to inspect its declared executables. This searches PATH, while `pip` installs Python packages.
 
