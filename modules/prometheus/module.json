@@ -1,6 +1,7 @@
 {
     "name": "prometheus",
     "description": "Prometheus SUID/SGID scanner with optional GTFOBins lookup",
+    "category": "exploit",
     "entry": "prometheus.sh",
     "options": {
         "ROOT_CHECK": {

@@ -1,6 +1,7 @@
 {
     "name": "davinci",
     "description": "Da Vinci hashcat wrapper for hash cracking",
+    "category": "exploit",
     "entry": "davinci.sh",
     "options": {
         "HASH": {

@@ -28,6 +28,27 @@ class TestNormalizeModule(unittest.TestCase):
 
         self.assertEqual(tool["dependencies"], [])
 
+    def test_preserves_declared_category(self):
+        metadata = {
+            "name": "example",
+            "entry": "example.py",
+            "category": "active",
+        }
+
+        tool = normalize_module(metadata, "modules/example")
+
+        self.assertEqual(tool["category"], "active")
+
+    def test_defaults_category_to_uncategorized_when_omitted(self):
+        metadata = {
+            "name": "example",
+            "entry": "example.py",
+        }
+
+        tool = normalize_module(metadata, "modules/example")
+
+        self.assertEqual(tool["category"], "uncategorized")
+
 class TestLoadModules(unittest.TestCase):
     def test_skips_invalid_metadata_and_loads_valid_module(self):
         with TemporaryDirectory() as directory:

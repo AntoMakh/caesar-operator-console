@@ -1,6 +1,7 @@
 {
     "name": "napoleon",
     "description": "Napoleon DNS Zone Transfer checker",
+    "category": "active",
     "entry": "napoleon.sh",
     "options": {
         "DOMAIN": {

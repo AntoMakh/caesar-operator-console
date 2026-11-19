@@ -138,6 +138,8 @@ Foreground runs return nonblank, stripped stdout lines on success. Stderr remain
 
 Run `tools`, `info <tool>`, and `options` to inspect available settings. Module behavior and dependencies differ, and platform-specific tools need an appropriate environment.
 
+`tools` groups modules by the `category` declared in each `module.json`. Use `passive` for Veni, `active` for Vidi, and `exploit` for Vici. You can run `select <tool>` from any category. Modules without a recognized category appear under **Other**.
+
 ## Architecture
 
 ```text
@@ -172,6 +174,7 @@ Place the entry script and `module.json` in `modules/<tool-name>/`. The folder n
 {
   "name": "example",
   "description": "Example Python tool",
+  "category": "active",
   "entry": "example.py",
   "argument_order": ["TARGET", "THREADS"],
   "dependencies": [],
