@@ -3,6 +3,7 @@ import unittest
 from contextlib import redirect_stdout
 from unittest.mock import call, patch
 
+from module_loader import load_modules
 from pipeline_engine import PipelineEngine
 
 class TestResolveTemplates(unittest.TestCase):
@@ -198,6 +199,36 @@ class TestBuildCommand(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "TARGET: a value is required"):
             self.engine.build_command("example", {})
+
+class TestSuntzuCommand(unittest.TestCase):
+    def setUp(self):
+        tools = load_modules()
+        with patch.object(PipelineEngine, "load_workflows", return_value={}):
+            self.engine = PipelineEngine({"suntzu": tools["suntzu"]})
+        self.options = {
+            "TARGET": "http://127.0.0.1",
+            "PORT": "8000",
+            "WORDLIST": "tests/fixtures/web_demo/words.txt",
+            "QUIET": True,
+        }
+
+    def test_excludes_404_by_default(self):
+        command = self.engine.build_command("suntzu", self.options)
+
+        flag_index = command.index("--exclude-codes")
+        self.assertEqual(command[flag_index + 1], "404")
+
+    def test_explicit_exclusions_override_default(self):
+        self.options["EXCLUDED_STATUS_CODES"] = "403,404"
+
+        command = self.engine.build_command("suntzu", self.options)
+
+        flag_index = command.index("--exclude-codes")
+        self.assertEqual(command[flag_index + 1], "403,404")
+        self.assertEqual(
+            self.engine.tools["suntzu"]["options"]["EXCLUDED_STATUS_CODES"]["default"],
+            "404",
+        )
 
 class TestRunWorkflow(unittest.TestCase):
     def setUp(self):
