@@ -1,6 +1,9 @@
 import io
+import os
+import re
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from contextlib import redirect_stdout
@@ -8,6 +11,7 @@ from unittest.mock import patch
 
 from caesar import CaesarConsole
 from module_loader import normalize_module
+from module_runner import run_module_and_log
 from pipeline_engine import PipelineEngine
 
 
@@ -133,3 +137,74 @@ class TestBackgroundJobStatus(unittest.TestCase):
         self.assertIn("EXIT", text)
         self.assertIn("Failed", text)
         self.assertIn("5", text)
+
+
+@unittest.skipIf(os.name == "nt", "POSIX process-group semantics")
+class TestProcessTreeTermination(unittest.TestCase):
+    PARENT = (
+        "import subprocess, sys, time\n"
+        "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])\n"
+        "print(child.pid, flush=True)\n"
+        "time.sleep(60)\n"
+    )
+
+    def _wait_for_child_pid(self, log_path):
+        for _ in range(100):
+            try:
+                text = open(log_path, encoding="utf-8").read()
+            except OSError:
+                text = ""
+            match = re.search(r"^\s*(\d+)\s*$", text, re.MULTILINE)
+            if match:
+                return int(match.group(1))
+            time.sleep(0.05)
+        return None
+
+    def _is_alive(self, pid):
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+
+    def test_terminate_process_kills_the_child(self):
+        console = make_console()
+        with tempfile.TemporaryDirectory() as tmp:
+            script = os.path.join(tmp, "parent.py")
+            open(script, "w", encoding="utf-8").write(self.PARENT)
+            process, log_path = run_module_and_log("t", [script], output_dir=tmp, background=True)
+
+            child_pid = self._wait_for_child_pid(log_path)
+            self.assertIsNotNone(child_pid, "parent never reported a child pid")
+            # start_new_session makes the job its own process-group leader
+            self.assertEqual(os.getpgid(process.pid), process.pid)
+
+            console._terminate_process(process)
+
+            for _ in range(100):
+                if not self._is_alive(child_pid):
+                    break
+                time.sleep(0.05)
+            self.assertFalse(self._is_alive(child_pid), "child survived termination")
+
+    def test_exit_terminates_running_jobs(self):
+        console = make_console()
+        with tempfile.TemporaryDirectory() as tmp:
+            script = os.path.join(tmp, "parent.py")
+            open(script, "w", encoding="utf-8").write(self.PARENT)
+            process, log_path = run_module_and_log("t", [script], output_dir=tmp, background=True)
+            console.jobs[1] = {
+                "id": 1, "tool": "t", "status": "Running", "exit_code": None,
+                "log_path": log_path, "process": process, "timer": None,
+                "start_time": time.time(), "end_time": None,
+            }
+
+            with redirect_stdout(io.StringIO()):
+                result = console.do_exit("")
+
+            self.assertTrue(result)
+            self.assertEqual(console.jobs[1]["status"], "Terminated")
+            # the parent process has actually been stopped
+            self.assertIsNotNone(process.poll())
