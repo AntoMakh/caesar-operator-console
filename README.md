@@ -219,7 +219,9 @@ Global options are stored in Caesar and applied to matching module options. Save
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-The suite currently contains 31 tests covering template substitution, command construction and defaults, unknown option rejection, validation, workflow iteration and failure settings, missing iteration inputs, dependency checks, invalid module metadata, output separation, URL construction, and unique logs. Test processes use harmless Python commands and temporary directories. Network calls in unit tests are mocked. Some tests intentionally print warnings or errors while checking failure behavior.
+The suite currently contains 58 tests covering template substitution, command construction and defaults, unknown option rejection, validation, workflow iteration and failure settings, missing iteration inputs, workflow field validation, dependency checks, invalid module metadata, output separation, URL construction, unique logs, background job exit status, background process-tree termination, and module behavior for DaVinci, Napoleon, and Mercator. Test processes use harmless Python commands and temporary directories. Network calls in unit tests are mocked. Some tests intentionally print warnings or errors while checking failure behavior.
+
+Continuous integration runs the same `unittest` discovery on Python 3.11, 3.12, and 3.13 for every push to `main` and every pull request (`.github/workflows/tests.yml`). The process-tree termination tests are skipped on non-POSIX runners.
 
 The local fixture demonstration above additionally exercises real subprocesses and HTTP requests over loopback.
 
