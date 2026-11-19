@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
-from logging import exception
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple
 import argparse
 import os
-import requests
 import sys
 import threading
 import concurrent.futures
