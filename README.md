@@ -99,7 +99,7 @@ deselect
 
 ## How workflows work
 
-Workflow definitions live in `workflows/`. The included `web_recon` discovers web paths and fingerprints each result. `dns_recon` discovers subdomains and fingerprints them over HTTPS, and requires a reachable target and DNS access.
+Workflow definitions live in `workflows/`. The included `web_recon` discovers web paths and fingerprints each result. `dns_recon` discovers subdomains and fingerprints them over HTTPS, and requires a reachable target and DNS access. `service_recon` scans a host for open TCP ports with Kongming and grabs a banner from each one with Bismarck; Kongming's quiet output is a plain list of open port numbers, which the banner stage iterates over.
 
 | Field | Meaning |
 | --- | --- |
@@ -129,6 +129,7 @@ Foreground runs return nonblank, stripped stdout lines on success. Stderr remain
 | Bismarck | Service banner grabbing | Bash |
 | DaVinci | Hashcat wrapper for hash cracking | Bash |
 | Judas | Search directory resources for keywords | Bash |
+| Kongming | TCP connect port scanning | Python |
 | Magellan | DNS subdomain enumeration | Python |
 | Mercator | Certificate transparency subdomain enumeration via crt.sh | Python |
 | Napoleon | DNS zone transfer checks | Bash |
