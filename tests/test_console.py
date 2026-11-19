@@ -208,3 +208,48 @@ class TestProcessTreeTermination(unittest.TestCase):
             self.assertEqual(console.jobs[1]["status"], "Terminated")
             # the parent process has actually been stopped
             self.assertIsNotNone(process.poll())
+class TestToolsGrouping(unittest.TestCase):
+    def make_console(self, tools):
+        with patch("caesar.load_modules", return_value=tools):
+            with patch.object(PipelineEngine, "load_workflows", return_value={}):
+                return CaesarConsole()
+
+    def tool(self, category):
+        return normalize_module(
+            {"name": "x", "entry": "x.py", "description": f"a {category} tool", "category": category},
+            "modules/x",
+        )
+
+    def test_groups_tools_under_phase_headings(self):
+        tools = {
+            "mercator": self.tool("passive"),
+            "kongming": self.tool("active"),
+            "davinci": self.tool("exploit"),
+        }
+        console = self.make_console(tools)
+        output = io.StringIO()
+        with redirect_stdout(output):
+            console.do_tools("")
+        text = output.getvalue()
+
+        self.assertIn("Veni", text)
+        self.assertIn("Vidi", text)
+        self.assertIn("Vici", text)
+        # passive heading comes before the active heading, which comes before exploit
+        self.assertLess(text.index("Veni"), text.index("Vidi"))
+        self.assertLess(text.index("Vidi"), text.index("Vici"))
+        # each tool is listed after its own heading
+        self.assertLess(text.index("Veni"), text.index("mercator"))
+        self.assertLess(text.index("Vidi"), text.index("kongming"))
+        self.assertLess(text.index("Vici"), text.index("davinci"))
+
+    def test_unknown_category_falls_under_other(self):
+        console = self.make_console({"mystery": self.tool("something-new")})
+        output = io.StringIO()
+        with redirect_stdout(output):
+            console.do_tools("")
+        text = output.getvalue()
+
+        self.assertIn("Other", text)
+        self.assertIn("mystery", text)
+        self.assertNotIn("Veni", text)

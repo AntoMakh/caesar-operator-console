@@ -1,0 +1,29 @@
+{
+    "workflow_name": "service_recon",
+    "fail_fast": false,
+    "required_inputs": [
+        "TARGET",
+        "PORTS"
+    ],
+    "stages": [
+        {
+            "name": "scan_ports",
+            "tool": "kongming",
+            "options": {
+                "TARGET": "{{TARGET}}",
+                "PORTS": "{{PORTS}}",
+                "QUIET": true
+            },
+            "output": "open_ports"
+        },
+        {
+            "name": "grab_banners",
+            "tool": "bismarck",
+            "iterate_over": "open_ports",
+            "options": {
+                "TARGET": "{{TARGET}}",
+                "PORT": "{{item}}"
+            }
+        }
+    ]
+}

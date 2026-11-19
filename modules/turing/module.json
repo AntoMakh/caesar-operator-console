@@ -1,6 +1,7 @@
 {
     "name": "turing",
     "description": "Turing web technology fingerprinting tool",
+    "category": "active",
     "entry": "turing.py",
     "options": {
         "TARGET": {

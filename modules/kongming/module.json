@@ -1,0 +1,47 @@
+{
+    "name": "kongming",
+    "description": "Kongming TCP connect port scanner",
+    "category": "active",
+    "entry": "kongming.py",
+    "options": {
+        "TARGET": {
+            "required": true,
+            "description": "Target host or IP address"
+        },
+        "PORTS": {
+            "required": false,
+            "default": "21,22,23,25,53,80,110,143,443,445,3306,3389,8080",
+            "flag": "--ports",
+            "description": "Ports to scan, e.g. 1-1024 or 22,80,443 or 20-25,80"
+        },
+        "THREADS": {
+            "required": false,
+            "default": 50,
+            "type": "integer",
+            "min": 1,
+            "max": 500,
+            "flag": "--threads",
+            "description": "Number of concurrent worker threads"
+        },
+        "TIMEOUT": {
+            "required": false,
+            "default": "1.0",
+            "flag": "--timeout",
+            "description": "Connection timeout in seconds (greater than 0, up to 300)"
+        },
+        "QUIET": {
+            "required": false,
+            "type": "boolean",
+            "flag": "--quiet",
+            "description": "Output only open port numbers for pipelining"
+        }
+    },
+    "argument_order": [
+        "TARGET",
+        "PORTS",
+        "THREADS",
+        "TIMEOUT",
+        "QUIET"
+    ],
+    "dependencies": []
+}

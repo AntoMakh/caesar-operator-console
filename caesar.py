@@ -8,6 +8,7 @@ import os
 import shlex
 import signal
 from module_runner import run_module_and_log
+from banner import render_banner
 import shutil
 import threading
 from pipeline_engine import PipelineEngine
@@ -25,28 +26,6 @@ except ImportError:
 
 
 class CaesarConsole(cmd.Cmd):
-    intro = """
-WRITTEN BY
- ________
-/        \\
-| b1smrk |
-\\________/
-                                     |__
-                                     |\\/
-                                     ---
-                                     / | [
-                              !      | |||
-                            _/|     _/|-++'
-                        +  +--|    |--|--|_ |-
-                     { /|__|  |/\\__|  |--- |||__/
-                    +---------------___[}-_===_.'____                 /\\
-                ____`-' ||___-{]_| _[}-  |     |_[___\\==--            \\/   _
- __..._____--==/___]_|__|_____________________________[___\\==--____,------' .7
-|                                                                          /
- \\_________________________________________________________________________|
-
-Welcome to the Caesar Operator Console. Type help to list commands.
-"""
     prompt = 'caesar > '
     settings_file = ".caesar_settings.json"
 
@@ -57,6 +36,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
         self.jobs = {}
         self.job_counter = 1
         self.pipeline_engine = PipelineEngine(self.tools)
+        self.intro = render_banner(len(self.tools), len(self.pipeline_engine.workflows))
 
     current_tool = None
 
@@ -193,11 +173,36 @@ Welcome to the Caesar Operator Console. Type help to list commands.
     def default(self, arg):
         print("Unknown command: " + arg +". Type 'help' to see available commands.")
 
+    tool_phases = [
+        ("passive", "Veni  -  passive reconnaissance (gather without touching the target)"),
+        ("active", "Vidi  -  active reconnaissance (probe the target directly)"),
+        ("exploit", "Vici  -  exploitation and post-exploitation (take the machine)"),
+    ]
+
     def do_tools(self, arg):
+        """list available tools grouped by Veni, Vidi, and Vici phases."""
         print("Available tools:")
+        if not self.tools:
+            return
         name_width = max(len(tool_name) for tool_name in self.tools)
-        for tool_name, tool_info in self.tools.items():
-            print(f" - {tool_name:<{name_width}}  {tool_info['description']}")
+        shown = set()
+        for category, heading in self.tool_phases:
+            members = [
+                (name, info)
+                for name, info in self.tools.items()
+                if info.get("category") == category
+            ]
+            if not members:
+                continue
+            print(f"\n  {heading}")
+            for name, info in members:
+                print(f"    {name:<{name_width}}  {info['description']}")
+                shown.add(name)
+        others = [(name, info) for name, info in self.tools.items() if name not in shown]
+        if others:
+            print("\n  Other")
+            for name, info in others:
+                print(f"    {name:<{name_width}}  {info['description']}")
 
     def do_select(self, arg):
         if(arg.strip() == ""):
