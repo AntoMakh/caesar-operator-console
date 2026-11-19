@@ -93,7 +93,7 @@ class PipelineEngine:
                 continue
             if "iterate_over" not in stage:
                 resolved_options = {}
-                for option_name, option_value in stage["options"].items():
+                for option_name, option_value in stage.get("options", {}).items():
                     resolved_options[option_name] = self.resolve_templates(option_value, context)
                 try:
                     command = self.build_command(tool_name, resolved_options)
@@ -139,7 +139,7 @@ class PipelineEngine:
                         context["item"] = item
 
                         resolved_options = {}
-                        for option_name, option_value in stage["options"].items():
+                        for option_name, option_value in stage.get("options", {}).items():
                             resolved_options[option_name] = self.resolve_templates(option_value, context)
                         
                         try:

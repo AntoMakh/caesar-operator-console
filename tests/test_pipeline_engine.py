@@ -475,3 +475,26 @@ class TestRunWorkflow(unittest.TestCase):
                 )
 
         mock_run.assert_not_called()
+
+    def test_stage_without_options_uses_module_defaults(self):
+        self.engine.tools["discover"]["options"]["DOMAIN"]["default"] = "example.com"
+        self.engine.tools["inspect"]["options"]["TARGET"]["default"] = "https://default"
+        stages = self.engine.workflows["demo"]["stages"]
+        del stages[0]["options"]
+        del stages[1]["options"]
+
+        with patch("pipeline_engine.run_module_and_log") as mock_run:
+            mock_run.side_effect = [
+                (["alpha.example.com"], True),
+                (["alpha: nginx"], True),
+            ]
+
+            self.engine.run_workflow("demo", {})
+
+        self.assertEqual(
+            mock_run.call_args_list,
+            [
+                call("discover", ["discover.py", "example.com"], background=False),
+                call("inspect", ["inspect.py", "https://default"], background=False),
+            ],
+        )
