@@ -5,8 +5,13 @@
     "options": {
         "TARGET": {
             "required": true
+        },
+        "QUIET": {
+            "required": false,
+            "type": "boolean",
+            "flag": "--quiet"
         }
     },
-    "argument_order": ["TARGET"],
+    "argument_order": ["TARGET", "QUIET"],
     "dependencies": []
 }
