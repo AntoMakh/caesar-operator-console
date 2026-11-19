@@ -1,4 +1,7 @@
 import io
+import subprocess
+import sys
+import time
 import unittest
 from contextlib import redirect_stdout
 from unittest.mock import patch
@@ -6,6 +9,12 @@ from unittest.mock import patch
 from caesar import CaesarConsole
 from module_loader import normalize_module
 from pipeline_engine import PipelineEngine
+
+
+def make_console(tools=None):
+    with patch("caesar.load_modules", return_value=tools or {}):
+        with patch.object(PipelineEngine, "load_workflows", return_value={}):
+            return CaesarConsole()
 
 
 class TestConsoleDependencies(unittest.TestCase):
@@ -69,3 +78,58 @@ class TestPipelineArgumentParsing(unittest.TestCase):
 
         self.assertIsNone(result)
         self.assertIn("Could not parse arguments", output.getvalue())
+
+
+class TestBackgroundJobStatus(unittest.TestCase):
+    def _job(self, console, job_id, process):
+        console.jobs[job_id] = {
+            "id": job_id, "tool": "x", "status": "Running", "exit_code": None,
+            "log_path": "", "process": process, "timer": None,
+            "start_time": time.time(), "end_time": None,
+        }
+
+    def test_watch_job_records_failure_exit_code(self):
+        console = make_console()
+        proc = subprocess.Popen([sys.executable, "-c", "import sys; sys.exit(3)"])
+        self._job(console, 1, proc)
+
+        console._watch_job(1, proc)
+
+        self.assertEqual(console.jobs[1]["status"], "Failed")
+        self.assertEqual(console.jobs[1]["exit_code"], 3)
+        self.assertIsNotNone(console.jobs[1]["end_time"])
+
+    def test_watch_job_records_success(self):
+        console = make_console()
+        proc = subprocess.Popen([sys.executable, "-c", "import sys; sys.exit(0)"])
+        self._job(console, 1, proc)
+
+        console._watch_job(1, proc)
+
+        self.assertEqual(console.jobs[1]["status"], "Finished")
+        self.assertEqual(console.jobs[1]["exit_code"], 0)
+
+    def test_watch_job_leaves_terminated_status_untouched(self):
+        console = make_console()
+        proc = subprocess.Popen([sys.executable, "-c", "import sys; sys.exit(1)"])
+        self._job(console, 1, proc)
+        console.jobs[1]["status"] = "Terminated"
+
+        console._watch_job(1, proc)
+
+        self.assertEqual(console.jobs[1]["status"], "Terminated")
+
+    def test_jobs_listing_shows_exit_column(self):
+        console = make_console()
+        proc = subprocess.Popen([sys.executable, "-c", "import sys; sys.exit(5)"])
+        self._job(console, 1, proc)
+        console._watch_job(1, proc)
+
+        output = io.StringIO()
+        with redirect_stdout(output):
+            console.do_jobs("")
+        text = output.getvalue()
+
+        self.assertIn("EXIT", text)
+        self.assertIn("Failed", text)
+        self.assertIn("5", text)

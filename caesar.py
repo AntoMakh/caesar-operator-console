@@ -447,6 +447,7 @@ Welcome to the Caesar Operator Console. Type help to list commands.
                 "id": job_id,
                 "tool": self.current_tool,
                 "status": "Running",
+                "exit_code": None,
                 "log_path": log_path,
                 "process": process,
                 "timer": None,
@@ -461,12 +462,13 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             run_module_and_log(self.current_tool, command, background=False)
 
     def _watch_job(self, job_id: int, process: subprocess.Popen) -> None:
-        """watcher that gets end time of subprocess (job) running in backgroud"""
+        """watcher that records the exit status of a background job."""
         process.wait()
         if job_id in self.jobs:
             job = self.jobs[job_id]
             if job["status"] == "Running":
-                job["status"] = "Finished"
+                job["exit_code"] = process.returncode
+                job["status"] = "Finished" if process.returncode == 0 else "Failed"
                 job["end_time"] = time.time()
                 if job.get("timer"):
                     job["timer"].cancel()
@@ -586,13 +588,15 @@ Welcome to the Caesar Operator Console. Type help to list commands.
             print("  No background jobs.")
             return
         
-        print(f"{'JOB_ID':<10}{'TOOL':<18}{'STATUS':<14}{'DURATION':<12}{'LOG FILE':<40}")
-        print("-" * 95)
+        print(f"{'JOB_ID':<10}{'TOOL':<18}{'STATUS':<14}{'EXIT':<6}{'DURATION':<12}{'LOG FILE':<40}")
+        print("-" * 101)
         for job_id, job in self.jobs.items():
             end_time = job["end_time"] if job["end_time"] else time.time()
             duration_str = self._format_duration(end_time - job["start_time"])
+            exit_code = job.get("exit_code")
+            exit_str = "-" if exit_code is None else str(exit_code)
 
-            print(f"[{job_id}]       {job['tool']:<18}{job['status']:<14}{duration_str:<12}{job['log_path']:<40}")
+            print(f"[{job_id}]       {job['tool']:<18}{job['status']:<14}{exit_str:<6}{duration_str:<12}{job['log_path']:<40}")
     
     def _format_duration(self, seconds: float) -> str:
         total_seconds = int(seconds)
