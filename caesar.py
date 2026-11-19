@@ -5,6 +5,7 @@ import subprocess
 from module_loader import load_modules, ToolSchema, OptionSchema
 import json
 import os
+import shlex
 from module_runner import run_module_and_log
 import shutil
 import threading
@@ -658,7 +659,11 @@ Welcome to the Caesar Operator Console. Type help to list commands.
                 job["end_time"] = time.time()
 
     def do_pipeline(self, arg):
-        parts = arg.strip().split()
+        try:
+            parts = shlex.split(arg)
+        except ValueError as error:
+            print(f"[!] Could not parse arguments: {error}")
+            return
         if not parts or parts[0] == "list":
             for workflow, workflow_items in self.pipeline_engine.workflows.items():
                 print(f"- {workflow}")

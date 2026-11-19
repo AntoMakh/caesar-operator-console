@@ -226,7 +226,7 @@ The local fixture demonstration above additionally exercises real subprocesses a
 ## Current limits and roadmap
 
 - Workflow field types and `iterate_over` references are checked at startup, but unknown tools are only detected when their stage is reached. Unknown option names are rejected during command preparation. A missing iteration reference reports an error and follows `fail_fast`, while an existing empty list skips normally. Unresolved templates retain their original text, and iteration input types need further validation.
-- Pipeline arguments are split on whitespace. Use parameter values without spaces for the documented workflow commands.
+- Pipeline arguments are parsed with shell-style quoting. A value containing spaces must be quoted, for example `pipeline run web_recon "TARGET=http://127.0.0.1" "WORDLIST=word list.txt"`.
 - Foreground pipelines run sequentially. Background execution applies to individual tools.
 - Background job exit-status reporting, process-tree cancellation, and exit cleanup need further work.
 - Turing uses heuristic signatures, and header versions or body markers can be missing or misleading.
