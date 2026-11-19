@@ -13,12 +13,69 @@ class StageSchema(TypedDict):
     options: NotRequired[Dict[str, Any]]
     output: NotRequired[str]
     iterate_over: NotRequired[str]
+    fail_fast: NotRequired[bool]
 
-class WorkflowSchema(TypedDict, total=False):
+class WorkflowSchema(TypedDict):
     workflow_name: str
-    required_inputs: List[str]
+    required_inputs: NotRequired[List[str]]
     fail_fast: NotRequired[bool]
     stages: list[StageSchema]
+
+def is_non_empty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+def validate_stage_fields(stage: Any, index: int, earlier_outputs: List[str]) -> None:
+    """Check the field types and references needed to run one stage."""
+    if not isinstance(stage, dict):
+        raise ValueError(f"stage {index} must be an object")
+
+    if not is_non_empty_string(stage.get("name")):
+        raise ValueError(f"stage {index}: 'name' must be a non-empty string")
+    label = f"stage '{stage['name']}'"
+
+    if not is_non_empty_string(stage.get("tool")):
+        raise ValueError(f"{label}: 'tool' must be a non-empty string")
+
+    if not isinstance(stage.get("options", {}), dict):
+        raise ValueError(f"{label}: 'options' must be an object")
+
+    if "fail_fast" in stage and not isinstance(stage["fail_fast"], bool):
+        raise ValueError(f"{label}: 'fail_fast' must be true or false")
+
+    for field in ("output", "iterate_over"):
+        if field in stage and not is_non_empty_string(stage[field]):
+            raise ValueError(f"{label}: '{field}' must be a non-empty string")
+
+    iteration_key = stage.get("iterate_over")
+    if iteration_key is not None and iteration_key not in earlier_outputs:
+        raise ValueError(
+            f"{label}: 'iterate_over' value '{iteration_key}' "
+            f"is not the output of an earlier stage"
+        )
+
+def validate_workflow_fields(workflow: Dict[str, Any]) -> None:
+    """Check the field types and references needed to run a workflow."""
+    if not is_non_empty_string(workflow.get("workflow_name")):
+        raise ValueError("'workflow_name' must be a non-empty string")
+
+    required_inputs = workflow.get("required_inputs", [])
+    if not isinstance(required_inputs, list) or not all(
+        isinstance(value, str) for value in required_inputs
+    ):
+        raise ValueError("'required_inputs' must be a list of strings")
+
+    if "fail_fast" in workflow and not isinstance(workflow["fail_fast"], bool):
+        raise ValueError("'fail_fast' must be true or false")
+
+    stages = workflow.get("stages")
+    if not isinstance(stages, list):
+        raise ValueError("'stages' must be a list")
+
+    earlier_outputs = []
+    for index, stage in enumerate(stages, start=1):
+        validate_stage_fields(stage, index, earlier_outputs)
+        if "output" in stage:
+            earlier_outputs.append(stage["output"])
 
 class PipelineEngine:
     def __init__(self, tools: Dict[str, Any] = None):
@@ -44,14 +101,16 @@ class PipelineEngine:
                 print(f"[!] Warning: {workflow_name} must contain a JSON object. Skipping.")
                 continue
 
-            name = workflow.get("workflow_name")
-            if name:
-                workflows[name] = workflow
-            else:
-                print(f"[!] Warning: {workflow_name} is missing a workflow_name field")
+            try:
+                validate_workflow_fields(workflow)
+            except ValueError as error:
+                print(f"[!] Warning: invalid workflow {workflow_name}: {error}. Skipping.")
                 continue
+
+            workflows[workflow["workflow_name"]] = workflow
         return workflows
-        
+
+
     def run_workflow(self, workflow_name: str, initial_context: Dict[str, Any]) -> None:
         """
         Run the stages of a loaded workflow in order.

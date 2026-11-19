@@ -1,4 +1,5 @@
 import io
+import json
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -255,6 +256,111 @@ class TestLoadWorkflows(unittest.TestCase):
         self.assertIn("broken.json", output.getvalue())
         self.assertIn("list_root.json must contain a JSON object", output.getvalue())
         self.assertIn("string_root.json must contain a JSON object", output.getvalue())
+
+    def test_skips_workflows_with_invalid_fields(self):
+        valid_stage = {"name": "discover", "tool": "discover", "output": "found"}
+        invalid_workflows = {
+            "no_name": ({"stages": []}, "'workflow_name' must be a non-empty string"),
+            "numeric_name": (
+                {"workflow_name": 7, "stages": []},
+                "'workflow_name' must be a non-empty string",
+            ),
+            "string_inputs": (
+                {"workflow_name": "a", "required_inputs": "DOMAIN", "stages": []},
+                "'required_inputs' must be a list of strings",
+            ),
+            "string_fail_fast": (
+                {"workflow_name": "b", "fail_fast": "yes", "stages": []},
+                "'fail_fast' must be true or false",
+            ),
+            "no_stages": ({"workflow_name": "c"}, "'stages' must be a list"),
+            "stage_not_object": (
+                {"workflow_name": "d", "stages": ["discover"]},
+                "stage 1 must be an object",
+            ),
+            "stage_without_name": (
+                {"workflow_name": "e", "stages": [{"tool": "discover"}]},
+                "stage 1: 'name' must be a non-empty string",
+            ),
+            "stage_without_tool": (
+                {"workflow_name": "f", "stages": [{"name": "discover"}]},
+                "stage 'discover': 'tool' must be a non-empty string",
+            ),
+            "list_options": (
+                {"workflow_name": "g", "stages": [dict(valid_stage, options=[])]},
+                "stage 'discover': 'options' must be an object",
+            ),
+            "stage_string_fail_fast": (
+                {"workflow_name": "h", "stages": [dict(valid_stage, fail_fast="no")]},
+                "stage 'discover': 'fail_fast' must be true or false",
+            ),
+            "numeric_output": (
+                {"workflow_name": "i", "stages": [dict(valid_stage, output=3)]},
+                "stage 'discover': 'output' must be a non-empty string",
+            ),
+            "unknown_iteration": (
+                {
+                    "workflow_name": "j",
+                    "stages": [
+                        valid_stage,
+                        {"name": "inspect", "tool": "inspect", "iterate_over": "missing"},
+                    ],
+                },
+                "stage 'inspect': 'iterate_over' value 'missing' "
+                "is not the output of an earlier stage",
+            ),
+            "iterates_over_own_output": (
+                {
+                    "workflow_name": "k",
+                    "stages": [dict(valid_stage, iterate_over="found")],
+                },
+                "stage 'discover': 'iterate_over' value 'found' "
+                "is not the output of an earlier stage",
+            ),
+        }
+
+        with TemporaryDirectory() as directory:
+            for file_name, (workflow, _) in invalid_workflows.items():
+                (Path(directory) / f"{file_name}.json").write_text(
+                    json.dumps(workflow), encoding="utf-8"
+                )
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                workflows = self.engine.load_workflows(directory)
+
+        self.assertEqual(workflows, {})
+        for file_name, (_, message) in invalid_workflows.items():
+            with self.subTest(file_name=file_name):
+                self.assertIn(
+                    f"invalid workflow {file_name}.json: {message}",
+                    output.getvalue(),
+                )
+
+    def test_loads_workflow_that_iterates_over_earlier_output(self):
+        workflow = {
+            "workflow_name": "chained",
+            "fail_fast": False,
+            "required_inputs": ["DOMAIN"],
+            "stages": [
+                {"name": "discover", "tool": "discover", "output": "found"},
+                {
+                    "name": "inspect",
+                    "tool": "inspect",
+                    "iterate_over": "found",
+                    "fail_fast": True,
+                    "options": {"TARGET": "{{item}}"},
+                },
+            ],
+        }
+
+        with TemporaryDirectory() as directory:
+            (Path(directory) / "chained.json").write_text(
+                json.dumps(workflow), encoding="utf-8"
+            )
+            workflows = self.engine.load_workflows(directory)
+
+        self.assertEqual(workflows, {"chained": workflow})
 
 class TestRunWorkflow(unittest.TestCase):
     def setUp(self):
