@@ -1,5 +1,7 @@
 import io
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from contextlib import redirect_stdout
 from unittest.mock import call, patch
 
@@ -229,6 +231,30 @@ class TestSuntzuCommand(unittest.TestCase):
             self.engine.tools["suntzu"]["options"]["EXCLUDED_STATUS_CODES"]["default"],
             "404",
         )
+
+class TestLoadWorkflows(unittest.TestCase):
+    def setUp(self):
+        with patch.object(PipelineEngine, "load_workflows", return_value={}):
+            self.engine = PipelineEngine()
+
+    def test_skips_unreadable_and_non_object_workflows(self):
+        with TemporaryDirectory() as directory:
+            workflows_dir = Path(directory)
+            (workflows_dir / "broken.json").write_text('{"stages":', encoding="utf-8")
+            (workflows_dir / "list_root.json").write_text("[]", encoding="utf-8")
+            (workflows_dir / "string_root.json").write_text('"demo"', encoding="utf-8")
+            (workflows_dir / "valid.json").write_text(
+                '{"workflow_name": "valid", "stages": []}', encoding="utf-8"
+            )
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                workflows = self.engine.load_workflows(directory)
+
+        self.assertEqual(list(workflows), ["valid"])
+        self.assertIn("broken.json", output.getvalue())
+        self.assertIn("list_root.json must contain a JSON object", output.getvalue())
+        self.assertIn("string_root.json must contain a JSON object", output.getvalue())
 
 class TestRunWorkflow(unittest.TestCase):
     def setUp(self):

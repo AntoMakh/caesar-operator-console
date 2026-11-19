@@ -33,13 +33,17 @@ class PipelineEngine:
             workflow_path = os.path.join(workflows_dir, workflow_name)
             if not workflow_path.endswith(".json"):
                 continue
-            with open(workflow_path, "r") as f:
-                try:
+            try:
+                with open(workflow_path, "r", encoding="utf-8-sig") as f:
                     workflow = json.load(f)
-                except json.JSONDecodeError as e:
-                    print(f"[!] Warning: failed to parse {workflow_name}: {e}")
-                    continue
-            
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as e:
+                print(f"[!] Warning: failed to parse {workflow_name}: {e}")
+                continue
+
+            if not isinstance(workflow, dict):
+                print(f"[!] Warning: {workflow_name} must contain a JSON object. Skipping.")
+                continue
+
             name = workflow.get("workflow_name")
             if name:
                 workflows[name] = workflow
