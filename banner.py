@@ -1,8 +1,7 @@
 """ASCII boot banner for the Caesar Operator Console."""
 
-# Laurel wreath in gold, the head in white, CAESAR in red.
+# Laurel wreath in gold; the head keeps the terminal's default color; CAESAR in red.
 GOLD = "\033[38;5;220m"
-WHITE = "\033[97m"
 RED = "\033[1;38;5;196m"
 DIM = "\033[2m"
 RESET = "\033[0m"
@@ -29,12 +28,12 @@ LETTERS = r"""   _________    ___________ ___    ____
 / /___/ ___ |/ /___ ___/ / ___ |/ _, _/
 \____/_/  |_/_____//____/_/  |_/_/ |_|"""
 
-# Dense braille cells are the solid head; sparse strokes are the laurel leaves.
+# Sparse braille strokes are the laurel leaves; dense cells are the solid head.
 _LEAF_MAX_DOTS = 5
 
 
 def _colorize_portrait(art: str) -> str:
-    """Color the head white and the laurel wreath gold, cell by cell."""
+    """Color the laurel wreath gold and leave the head in the terminal default."""
     lines = []
     for line in art.split("\n"):
         buf = []
@@ -42,12 +41,10 @@ def _colorize_portrait(art: str) -> str:
         for ch in line:
             code = ord(ch) - 0x2800
             dots = bin(code).count("1") if code > 0 else 0
-            if dots == 0:
-                color = None
-            elif dots > _LEAF_MAX_DOTS:
-                color = WHITE
-            else:
+            if 0 < dots <= _LEAF_MAX_DOTS:
                 color = GOLD
+            else:
+                color = None
             if color != current:
                 if current is not None:
                     buf.append(RESET)
