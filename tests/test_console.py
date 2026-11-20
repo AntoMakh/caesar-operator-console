@@ -1,13 +1,14 @@
 import io
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
 from contextlib import redirect_stdout
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 from caesar import CaesarConsole
 from module_loader import normalize_module
@@ -73,6 +74,16 @@ class TestPipelineArgumentParsing(unittest.TestCase):
 
         mock_run.assert_called_once_with("demo", {"TARGET": "hello world"})
 
+    def test_preserves_windows_paths_with_or_without_quotes(self):
+        console = self.make_console()
+        for value, expected in (
+            (r"C:\Users\Antonio\words.txt", r"C:\Users\Antonio\words.txt"),
+            (r'"C:\Users\Antonio\My Files\words.txt"', r"C:\Users\Antonio\My Files\words.txt"),
+        ):
+            with self.subTest(value=value), patch("caesar.os.name", "nt"):
+                mock_run = self.run_pipeline(console, f"run demo TARGET={value}")
+                mock_run.assert_called_once_with("demo", {"TARGET": expected})
+
     def test_reports_unbalanced_quotes_without_crashing(self):
         console = self.make_console()
         output = io.StringIO()
@@ -137,6 +148,65 @@ class TestBackgroundJobStatus(unittest.TestCase):
         self.assertIn("EXIT", text)
         self.assertIn("Failed", text)
         self.assertIn("5", text)
+
+    def test_taskkill_failure_leaves_job_running_and_blocks_exit(self):
+        console = make_console()
+        process = Mock(pid=123, returncode=None)
+        process.poll.return_value = None
+        self._job(console, 1, process)
+        output = io.StringIO()
+
+        def failed_taskkill(args, **kwargs):
+            result = subprocess.CompletedProcess(args, 1)
+            if kwargs.get("check"):
+                result.check_returncode()
+            return result
+
+        with (
+            patch("caesar.os.name", "nt"),
+            patch("caesar.subprocess.run", side_effect=failed_taskkill),
+            redirect_stdout(output),
+        ):
+            console.do_kill("1")
+            self.assertFalse(console.do_exit(""))
+
+        self.assertEqual(console.jobs[1]["status"], "Running")
+        self.assertIsNone(console.jobs[1]["end_time"])
+        self.assertIn("Could not stop job [1]", output.getvalue())
+        self.assertNotIn("Terminated", output.getvalue())
+
+    def test_posix_stop_cleans_up_group_even_if_parent_exits_first(self):
+        console = make_console()
+        process = Mock(pid=123, returncode=0)
+        process.poll.return_value = None
+        process.wait.return_value = 0
+
+        with (
+            patch("caesar.os.name", "posix"),
+            patch("caesar.os.getpgid", return_value=123, create=True),
+            patch("caesar.os.killpg", create=True) as kill_group,
+            patch("caesar.signal.SIGKILL", 9, create=True),
+        ):
+            console._terminate_process(process)
+
+        self.assertEqual(kill_group.call_args_list, [call(123, signal.SIGTERM), call(123, 9)])
+
+    def test_replaced_timer_cannot_stop_job(self):
+        console = make_console()
+        process = Mock(pid=123)
+        process.poll.return_value = None
+        self._job(console, 1, process)
+        replacement = Mock()
+        console.jobs[1]["timer"] = replacement
+
+        with (
+            patch("caesar.threading.current_thread", return_value=Mock()),
+            patch.object(console, "_terminate_process") as terminate,
+        ):
+            console._timeout_job(1)
+
+        terminate.assert_not_called()
+        self.assertIs(console.jobs[1]["timer"], replacement)
 
 
 @unittest.skipIf(os.name == "nt", "POSIX process-group semantics")

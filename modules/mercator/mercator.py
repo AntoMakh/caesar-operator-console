@@ -66,9 +66,9 @@ def extract_subdomains(certificates):
 
 def print_subdomains(subdomains, quiet=False):
     if not quiet:
-        print(f"[*] Discovered {len(subdomains)} unique names from crt.sh")
+        print(f"[*] Discovered {len(subdomains)} unique names from crt.sh", file=sys.stderr)
     for subdomain in sorted(subdomains):
-        print(subdomain if quiet else f"[+] {subdomain}")
+        print(subdomain)
 
 
 def main():

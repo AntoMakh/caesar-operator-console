@@ -1,6 +1,6 @@
 import io
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 
 from modules.mercator.mercator import extract_subdomains, print_subdomains
 
@@ -22,19 +22,21 @@ class TestExtractSubdomains(unittest.TestCase):
 class TestPrintSubdomains(unittest.TestCase):
     def test_quiet_prints_only_sorted_names(self):
         output = io.StringIO()
-        with redirect_stdout(output):
+        diagnostics = io.StringIO()
+        with redirect_stdout(output), redirect_stderr(diagnostics):
             print_subdomains({"b.example.com", "a.example.com"}, quiet=True)
 
         self.assertEqual(output.getvalue(), "a.example.com\nb.example.com\n")
+        self.assertEqual(diagnostics.getvalue(), "")
 
-    def test_verbose_adds_a_summary_and_markers(self):
+    def test_default_keeps_bare_names_on_stdout(self):
         output = io.StringIO()
-        with redirect_stdout(output):
-            print_subdomains({"a.example.com"}, quiet=False)
-        text = output.getvalue()
+        diagnostics = io.StringIO()
+        with redirect_stdout(output), redirect_stderr(diagnostics):
+            print_subdomains({"a.example.com"})
 
-        self.assertIn("Discovered 1 unique names", text)
-        self.assertIn("[+] a.example.com", text)
+        self.assertEqual(output.getvalue(), "a.example.com\n")
+        self.assertIn("Discovered 1 unique names", diagnostics.getvalue())
 
 
 if __name__ == "__main__":

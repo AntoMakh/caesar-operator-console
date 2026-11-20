@@ -232,9 +232,9 @@ The local fixture demonstration above additionally exercises real subprocesses a
 ## Current limits and roadmap
 
 - Workflow field types and `iterate_over` references are checked at startup, but unknown tools are only detected when their stage is reached. Unknown option names are rejected during command preparation. A missing iteration reference reports an error and follows `fail_fast`, while an existing empty list skips normally. Unresolved templates retain their original text, and iteration input types need further validation.
-- Pipeline arguments are parsed with shell-style quoting. A value containing spaces must be quoted, for example `pipeline run web_recon "TARGET=http://127.0.0.1" "WORDLIST=word list.txt"`.
+- Quote pipeline argument values containing spaces, such as `WORDLIST="word list.txt"`. On Windows, backslashes are preserved in both quoted and unquoted values.
 - Foreground pipelines run sequentially. Background execution applies to individual tools.
-- Background job exit-status reporting, process-tree cancellation, and exit cleanup need further work.
+- Job cleanup covers children found by Windows `taskkill` or in the same POSIX process group. A process that detaches from the job needs separate cleanup. If `exit` cannot stop a running job, Caesar stays open and reports the failure.
 - Turing uses heuristic signatures, and header versions or body markers can be missing or misleading.
 
 See [ROADMAP.md](ROADMAP.md) for priorities and explicit completion criteria. The Windows core-console checks and local web demo are the current verification baseline.

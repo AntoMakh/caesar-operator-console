@@ -34,6 +34,7 @@ class CaesarConsole(cmd.Cmd):
         self.tools = load_modules()
         self.global_options = {}
         self.jobs = {}
+        self._job_lock = threading.Lock()
         self.job_counter = 1
         self.pipeline_engine = PipelineEngine(self.tools)
         self.intro = render_banner(len(self.tools), len(self.pipeline_engine.workflows))
@@ -162,12 +163,14 @@ class CaesarConsole(cmd.Cmd):
         print("pipeline [list|run]    - List or execute automated workflows")
 
     def do_exit(self, arg):
-        running = [job for job in self.jobs.values() if job["process"].poll() is None]
-        for job in running:
-            self._mark_stopped(job, "Terminated")
-            self._terminate_process(job["process"])
-        if running:
-            print(f"[*] Terminated {len(running)} running background job(s) on exit.")
+        running = [job_id for job_id, job in self.jobs.items() if job["process"].poll() is None]
+        failed = [job_id for job_id in running if not self._stop_job(job_id, "Terminated")]
+        stopped = sum(self.jobs[job_id]["status"] == "Terminated" for job_id in running)
+        if stopped:
+            print(f"[*] Terminated {stopped} running background job(s) on exit.")
+        if failed:
+            print("[!] Staying in Caesar because some background jobs could not be stopped.")
+            return False
         print("[*] Exiting the Caesar Operator Console. Goodbye!")
         return True
     def default(self, arg):
@@ -475,16 +478,11 @@ class CaesarConsole(cmd.Cmd):
 
     def _watch_job(self, job_id: int, process: subprocess.Popen) -> None:
         """watcher that records the exit status of a background job."""
-        process.wait()
-        if job_id in self.jobs:
-            job = self.jobs[job_id]
-            if job["status"] == "Running":
-                job["exit_code"] = process.returncode
-                job["status"] = "Finished" if process.returncode == 0 else "Failed"
-                job["end_time"] = time.time()
-                if job.get("timer"):
-                    job["timer"].cancel()
-                    job["timer"] = None
+        exit_code = process.wait()
+        with self._job_lock:
+            job = self.jobs.get(job_id)
+            if job is not None and job["status"] == "Running":
+                self._mark_stopped(job, "Finished" if exit_code == 0 else "Failed")
 
     def do_follow(self, arg):
         """attach to a running background job and print its output live."""
@@ -553,19 +551,20 @@ class CaesarConsole(cmd.Cmd):
             print("[!] Job ID must be a valid id. Run 'jobs' to list valid job IDs")
             return
 
-        job = self.jobs[job_id]
-        if job["status"] != "Running":
-            print("[!] Job is already finished.")
-            return
+        with self._job_lock:
+            job = self.jobs[job_id]
+            if job["status"] != "Running":
+                print("[!] Job is already finished.")
+                return
 
-        if job["timer"] is not None:
-            print("[!] Timer already exists for selected job.")
-            return
+            if job["timer"] is not None:
+                print("[!] Timer already exists for selected job.")
+                return
 
-        timer = threading.Timer(seconds, self._timeout_job, args=[job_id])
-        timer.daemon = True
-        timer.start()
-        job["timer"] = timer
+            timer = threading.Timer(seconds, self._timeout_job, args=[job_id])
+            timer.daemon = True
+            job["timer"] = timer
+            timer.start()
         print(f"[+] Timer of {seconds} seconds set for job {job_id} ({job['tool']}).")
 
     def do_untimeout(self, arg):
@@ -585,13 +584,14 @@ class CaesarConsole(cmd.Cmd):
             print("[!] Job ID must be a valid id. Run 'jobs' to list valid job IDs")
             return
         
-        job = self.jobs[job_id]
-        if job["timer"] is None:
-            print(f"[!] Job {job_id} does not have an active timer.")
-            return
-        
-        job["timer"].cancel()
-        job["timer"] = None
+        with self._job_lock:
+            job = self.jobs[job_id]
+            if job["timer"] is None:
+                print(f"[!] Job {job_id} does not have an active timer.")
+                return
+
+            job["timer"].cancel()
+            job["timer"] = None
         print(f"[-] Removed timeout for job {job_id}.")
 
     def do_jobs(self,arg):
@@ -642,37 +642,63 @@ class CaesarConsole(cmd.Cmd):
             print("[!] Job ID must be an integer.")
 
     def _terminate_process(self, process: subprocess.Popen) -> None:
-        """stop a background process and the children it started."""
-        if process.poll() is not None:
-            return
-        try:
-            if os.name == "nt":
-                subprocess.run(
-                    f"taskkill /pid {process.pid} /F /T",
-                    shell=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            else:
-                group = os.getpgid(process.pid)
+        """Stop the job and raise if the stop request fails."""
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/pid", str(process.pid), "/F", "/T"],
+                check=True,
+                timeout=3,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        else:
+            # Background jobs start in their own session, with PID as group ID.
+            group = process.pid
+            try:
                 os.killpg(group, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            else:
                 try:
                     process.wait(timeout=3)
                 except subprocess.TimeoutExpired:
+                    pass
+                # The parent can exit while another member of the group survives.
+                try:
                     os.killpg(group, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError, OSError):
+                except ProcessLookupError:
+                    pass
+        process.wait(timeout=3)
+
+    def _stop_job(
+        self, job_id: int, status: str, *, expired_timer: Optional[threading.Thread] = None
+    ) -> bool:
+        """Serialize a stop request with the watcher and report failure."""
+        with self._job_lock:
+            job = self.jobs[job_id]
+            if expired_timer is not None:
+                if job["timer"] is not expired_timer:
+                    return True  # The timer was cancelled or replaced.
+                job["timer"] = None
+            process = job["process"]
+            if process.poll() is not None:
+                return True
             try:
-                process.kill()
-            except OSError:
-                pass
+                self._terminate_process(process)
+            except (OSError, subprocess.SubprocessError) as error:
+                print(f"[!] Could not stop job [{job_id}]: {error}")
+                return False
+            self._mark_stopped(job, status)
+            return True
 
     def _mark_stopped(self, job: dict, status: str) -> None:
         """record a job's final stopped state and cancel any pending timer."""
-        job["status"] = status
+        job["exit_code"] = job["process"].returncode
         job["end_time"] = time.time()
         if job.get("timer"):
             job["timer"].cancel()
             job["timer"] = None
+        job["status"] = status
 
     def do_kill(self, arg):
         """terminate a running background job by job id."""
@@ -685,27 +711,30 @@ class CaesarConsole(cmd.Cmd):
                 print(f"[!] Job [{job_id}] not found.")
                 return
             job = self.jobs[job_id]
-            if job["process"].poll() is None:
-                # Mark first so the watcher thread does not overwrite the status.
-                self._mark_stopped(job, "Terminated")
-                self._terminate_process(job["process"])
-                print(f"[-] Terminated job [{job_id}] ({job['tool']}).")
-            else:
+            if job["process"].poll() is not None:
                 print(f"[!] Job [{job_id}] is already finished.")
+                return
+            if self._stop_job(job_id, "Terminated"):
+                if job["status"] == "Terminated":
+                    print(f"[-] Terminated job [{job_id}] ({job['tool']}).")
+                else:
+                    print(f"[!] Job [{job_id}] is already finished.")
         except ValueError:
             print("[!] Job ID must be an integer.")
 
     def _timeout_job(self, job_id: int) -> None:
         """terminate a job and its children when its timer expires."""
         if job_id in self.jobs:
-            job = self.jobs[job_id]
-            if job["process"].poll() is None:
-                self._mark_stopped(job, "Timed Out")
-                self._terminate_process(job["process"])
+            self._stop_job(job_id, "Timed Out", expired_timer=threading.current_thread())
 
     def do_pipeline(self, arg):
         try:
-            parts = shlex.split(arg)
+            lexer = shlex.shlex(arg, posix=True)
+            lexer.whitespace_split = True
+            lexer.commenters = ""
+            if os.name == "nt":
+                lexer.escape = ""
+            parts = list(lexer)
         except ValueError as error:
             print(f"[!] Could not parse arguments: {error}")
             return
